@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPVTrackside Result Formatter 設定</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="number"], select {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover { background-color: #0056b3; }
+        .message { margin-top: 15px; padding: 10px; border-radius: 4px; text-align: center; }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FPVTrackside Result Formatter 設定</h1>
+        <form id="configForm">
+            <label for="fpvtrackside_dir_path">FPVTrackside ディレクトリパス:</label>
+            <input type="text" id="fpvtrackside_dir_path" name="fpvtrackside_dir_path" required>
+
+            <label for="google_spreadsheet_id">Google スプレッドシートID:</label>
+            <input type="text" id="google_spreadsheet_id" name="google_spreadsheet_id" required>
+
+            <label for="web_ui_port">Web UI ポート:</label>
+            <input type="number" id="web_ui_port" name="web_ui_port" required data-original-value=""> <!-- ★追加 -->
+
+            <label for="selected_event_id">処理するイベント:</label>
+            <select id="selected_event_id" name="selected_event_id">
+                <option value="all">すべてのイベント</option>
+            </select>
+
+            <button type="submit">設定を保存</button>
+        </form>
+        <div id="message" class="message"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('configForm');
+            const messageDiv = document.getElementById('message');
+            const eventSelect = document.getElementById('selected_event_id');
+
+            // イベントリストを読み込み
+            const loadEvents = () => {
+                // 既存のオプションをクリア（"すべてのイベント"以外）
+                while (eventSelect.children.length > 1) {
+                    eventSelect.removeChild(eventSelect.lastChild);
+                }
+
+                fetch('/api/events')
+                    .then(response => response.json())
+                    .then(events => {
+                        events.forEach(event => {
+                            const option = document.createElement('option');
+                            option.value = event.id;
+                            option.textContent = event.name;
+                            eventSelect.appendChild(option);
+                        });
+                        // 設定読み込み後に選択状態を反映するため、ここでは選択しない
+                    })
+                    .catch(error => {
+                        console.error('Error loading events:', error);
+                        // エラーメッセージを表示
+                    });
+            };
+
+            // ページロード時にイベントを読み込み
+            loadEvents();
+
+            // ドロップダウンがフォーカスされたときにイベントを再読み込み
+            eventSelect.addEventListener('focus', loadEvents);
+
+            // 現在の設定を読み込み
+            fetch('/api/config')
+                .then(response => response.json())
+                .then(config => {
+                    document.getElementById('fpvtrackside_dir_path').value = config.fpvtrackside_dir_path || '';
+                    document.getElementById('google_spreadsheet_id').value = config.google_spreadsheet_id || '';
+                    const webUiPortInput = document.getElementById('web_ui_port');
+                    webUiPortInput.value = config.web_ui_port || '';
+                    webUiPortInput.dataset.originalValue = config.web_ui_port || ''; // ★追加
+                    eventSelect.value = config.selected_event_id || 'all'; // ★選択状態を反映
+                })
+                .catch(error => {
+                    console.error('Error loading config:', error);
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = '設定の読み込みに失敗しました。';
+                });
+
+            // フォーム送信時の処理
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+
+                const newConfig = {
+                    fpvtrackside_dir_path: document.getElementById('fpvtrackside_dir_path').value,
+                    google_spreadsheet_id: document.getElementById('google_spreadsheet_id').value,
+                    web_ui_port: parseInt(document.getElementById('web_ui_port').value, 10),
+                    selected_event_id: eventSelect.value // ★選択されたイベントIDを送信
+                };
+
+                fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newConfig)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        messageDiv.className = 'message error';
+                        messageDiv.textContent = '設定の保存に失敗しました: ' + data.error;
+                    } else {
+                        messageDiv.className = 'message success';
+                        // ポートが変更されたかチェック
+                        const oldPort = parseInt(document.getElementById('web_ui_port').dataset.originalValue, 10);
+                        const newPort = parseInt(document.getElementById('web_ui_port').value, 10);
+
+                        if (oldPort !== newPort) {
+                            messageDiv.textContent = '設定が正常に保存されました。ポートを変更した場合は、スクリプトを再起動してください。' + 
+                                                    '現在のポート: ' + oldPort + ' -> 新しいポート: ' + newPort;
+                        } else {
+                            messageDiv.textContent = '設定が正常に保存されました。';
+                        }
+                        // 保存後、現在のポート値をoriginalValueに設定
+                        document.getElementById('web_ui_port').dataset.originalValue = newPort;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving config:', error);
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = '設定の保存中にエラーが発生しました。';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
