@@ -819,9 +819,12 @@ processEvents();
 // events ディレクトリの監視 (デバウンス処理を追加)
 fs.watch(eventsDir, { recursive: true }, (eventType, filename) => {
     if (filename) {
-        // recordinfo.xmlで終わるファイルは無視する
-        if (filename.endsWith('recordinfo.xml')) {
-            return;
+        const triggerFiles = ['Event.json', 'Pilots.json', 'Rounds.json', 'Race.json', 'Result.json'];
+        // 変更されたファイルが、処理に必要なファイルのいずれかで終わるかチェック
+        const isTriggerFile = triggerFiles.some(file => filename.endsWith(file));
+
+        if (!isTriggerFile) {
+            return; // 処理対象外のファイルなので何もしない
         }
 
         console.log(`Detected ${eventType} in ${filename}. Debouncing...`);
