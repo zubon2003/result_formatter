@@ -244,28 +244,12 @@ async function processEvents() {
         
 
         // Google Spreadsheetへの書き込み
-        const sanitizedRaceResults = sanitizeRaceResults(raceResults);
-        await updateGoogleSheet(sanitizedRaceResults, lapsToDo);
+        await updateGoogleSheet(raceResults, lapsToDo);
         await updateAllRankingSheets(pilotBests, allPilots);
 
     } catch (err) {
         console.error('Error processing events:', err);
     }
-}
-
-function sanitizeRaceResults(raceResults) {
-    // Return a new array with sanitized data
-    return raceResults.map((row, rowIndex) => {
-        return row.map((cell, colIndex) => {
-            // Check for invalid numeric or general values
-            const isInvalid = cell === null || cell === undefined || (typeof cell === 'number' && !isFinite(cell));
-            if (isInvalid) {
-                console.warn(`[Data Sanitization] Invalid data found in RaceResult at row ${rowIndex + 1}, column ${colIndex + 1}. Value: ${cell}. Replacing with blank.`);
-                return ''; // Replace invalid data with an empty string
-            }
-            return cell; // Keep valid data
-        });
-    });
 }
 
 async function updateGoogleSheet(raceResults, lapsToDo) {
