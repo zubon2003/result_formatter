@@ -17,6 +17,21 @@ const sheets = google.sheets({ version: 'v4', auth });
 let debounceTimer;
 const DEBOUNCE_DELAY = 5000; // 5秒のデバウンス遅延
 
+function sanitizeRaceResults(raceResults) {
+    // Return a new array with sanitized data
+    return raceResults.map((row, rowIndex) => {
+        return row.map((cell, colIndex) => {
+            // Check for invalid numeric or general values
+            const isInvalid = cell === null || cell === undefined || (typeof cell === 'number' && !isFinite(cell));
+            if (isInvalid) {
+                console.warn(`[Data Sanitization] Invalid data found in RaceResult at row ${rowIndex + 1}, column ${colIndex + 1}. Value: ${cell}. Replacing with blank.`);
+                return ''; // Replace invalid data with an empty string
+            }
+            return cell; // Keep valid data
+        });
+    });
+}
+
 // メインの処理を関数としてラップ
 async function processEvents() {
     try {
@@ -217,7 +232,7 @@ async function processEvents() {
                         updateBestTime('consecutive3Lap', consecutive3Lap, raceSerialTimestamp, raceName);
 
                         allResultsText += `  Position: ${result.Position}, Pilot: ${pilot.Name}, Points: ${result.Points}\n`;
-                        raceResults.push([
+                        const newRow = [
                             eventName,
                             raceName,
                             raceSerialTimestamp, // 日付用
@@ -231,7 +246,9 @@ async function processEvents() {
                             consecutive2Lap,
                             consecutive3Lap,
                             ...lapTimes // HS(LAP0)からLAP30まで
-                        ]);
+                        ];
+                        
+                        raceResults.push(newRow);
 
                     }
                 });
@@ -253,21 +270,6 @@ async function processEvents() {
     }
 }
 
-function sanitizeRaceResults(raceResults) {
-    // Return a new array with sanitized data
-    return raceResults.map((row, rowIndex) => {
-        return row.map((cell, colIndex) => {
-            // Check for invalid numeric or general values
-            const isInvalid = cell === null || cell === undefined || (typeof cell === 'number' && !isFinite(cell));
-            if (isInvalid) {
-                console.warn(`[Data Sanitization] Invalid data found in RaceResult at row ${rowIndex + 1}, column ${colIndex + 1}. Value: ${cell}. Replacing with blank.`);
-                return ''; // Replace invalid data with an empty string
-            }
-            return cell; // Keep valid data
-        });
-    });
-}
-
 async function updateGoogleSheet(raceResults, lapsToDo) {
     try {
         const spreadsheetId = config.google_spreadsheet_id;
@@ -286,6 +288,10 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
                 addSheet: {
                     properties: {
                         title: sheetName,
+                        gridProperties: {
+                            rowCount: 1000,
+                            columnCount: 100
+                        }
                     },
                 },
             };
@@ -364,6 +370,8 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
             'LAP21', 'LAP22', 'LAP23', 'LAP24', 'LAP25', 'LAP26', 'LAP27', 'LAP28', 'LAP29', 'LAP30'
         ];
 
+        
+
         requests.push({
             updateCells: {
                 rows: [{
@@ -382,63 +390,27 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
         });
 
         if (raceResults.length > 0) {
-            const colors = [
-                { red: 0.9, green: 0.9, blue: 0.9 }, // 灰色 (light gray)
-                { red: 1, green: 1, blue: 1 }       // 白
-            ];
-            let colorIndex = 0;
-            let currentHeatStartRow = 1; // データは2行目 (0-indexedで1) から始まる
-            let previousHeatName = raceResults[0][1]; // 最初のHEAT名
-
-            for (let i = 0; i < raceResults.length; i++) {
-                const heatName = raceResults[i][1]; // レース名（HEAT）は2列目（インデックス1）
-                const sheetRowIndex = i + 1; // シートの現在のデータ行インデックス (0-indexed)
-
-                // HEATが変わった場合、または最終行の場合
-                if (heatName !== previousHeatName || i === raceResults.length - 1) {
-                    // HEATが変わる前の行に罫線を追加 (最初のHEAT以外で、HEATが変わる場合)
-                    if (i > 0 && heatName !== previousHeatName) { // 最初のHEAT以外で、HEATが変わる場合
-                        requests.push({
-                            updateBorders: {
-                                range: {
-                                    sheetId: sheetId,
-                                    startRowIndex: sheetRowIndex - 1, // 前のHEATの最終データ行
-                                    endRowIndex: sheetRowIndex, // 罫線を入れる行
-                                    startColumnIndex: 0,
-                                    endColumnIndex: 43 // 全ての列
-                                },
-                                bottom: { style: 'SOLID', width: 1 }
-                            }
-                        });
-                    }
-
-                    requests.push({
-                        addBanding: {
-                            bandedRange: {
-                                range: {
-                                    sheetId: sheetId,
-                                    startRowIndex: currentHeatStartRow,
-                                    endRowIndex: sheetRowIndex, // このHEATの最終行まで
-                                    startColumnIndex: 0, // A列から
-                                    endColumnIndex: 43    // すべての列
-                                },
-                                rowProperties: {
-                                    firstBandColor: colors[colorIndex],
-                                    secondBandColor: colors[(colorIndex + 1) % colors.length] // 白
-                                }
-                            }
+            requests.push({
+                addBanding: {
+                    bandedRange: {
+                        range: {
+                            sheetId: sheetId,
+                            startRowIndex: 1,
+                            endRowIndex: 1 + raceResults.length,
+                            startColumnIndex: 0,
+                            endColumnIndex: 43
+                        },
+                        rowProperties: {
+                            firstBandColor: { red: 0.9, green: 0.9, blue: 0.9 }, // Even rows
+                            secondBandColor: { red: 1, green: 1, blue: 1 }      // Odd rows
                         }
-                    });
-
-                    // 次のHEATのためにリセット
-                    currentHeatStartRow = sheetRowIndex;
-                    previousHeatName = heatName;
-                    colorIndex = (colorIndex + 1) % colors.length;
+                    }
                 }
-            }
+            });
         }
 
         if (raceResults.length > 0) {
+            
             requests.push({
                 updateCells: {
                     rows: raceResults.map(row => ({
