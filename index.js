@@ -327,6 +327,21 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
             return;
         }
         const sheetId = sheet.properties.sheetId;
+        const currentColumnCount = sheet.properties.gridProperties ? sheet.properties.gridProperties.columnCount : 0; // Get current column count
+
+        if (currentColumnCount < 100) { // If current columns are less than desired
+            requests.push({
+                updateSheetProperties: {
+                    properties: {
+                        sheetId: sheetId,
+                        gridProperties: {
+                            columnCount: 100 // Resize to 100
+                        }
+                    },
+                    fields: 'gridProperties.columnCount'
+                }
+            });
+        }
 
         // --- シートの並び順を設定 ---
         requests.push({
@@ -384,7 +399,12 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
                         }
                     }))
                 }],
-                start: { sheetId: sheetId, rowIndex: 0, columnIndex: 0 },
+                range: {
+                    sheetId: sheetId,
+                    startRowIndex: 0,
+                    startColumnIndex: 0,
+                    endColumnIndex: 43 // Explicitly set to 43
+                },
                 fields: "userEnteredValue,userEnteredFormat"
             }
         });
