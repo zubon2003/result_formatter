@@ -57,6 +57,7 @@ async function processEvents() {
 
         const pilotBests = {};
         const allPilots = {};
+        const allValidLapTimes = [];
 
         for (const eventId of targetEventIds) { // ★ targetEventIds をループ
             const eventDir = path.join(eventsDir, eventId);
@@ -120,9 +121,21 @@ async function processEvents() {
                 const firstLap = raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
                 if (firstLap && firstLap.StartTime) {
                     const dateObj = new Date(firstLap.StartTime);
+                    
+                    // ローカルタイムゾーンの年、月、日、時、分、秒を取得
+                    const year = dateObj.getFullYear();
+                    const month = dateObj.getMonth();
+                    const day = dateObj.getDate();
+                    const hours = dateObj.getHours();
+                    const minutes = dateObj.getMinutes();
+                    const seconds = dateObj.getSeconds();
+
+                    // ローカル時刻の要素を使って、UTCとしてDateオブジェクトを再生成
+                    const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+
                     // Google Sheetsのシリアル値に変換 (UTC基準)
                     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-                    raceSerialTimestamp = (dateObj.getTime() - excelEpoch.getTime()) / (24 * 60 * 60 * 1000);
+                    raceSerialTimestamp = (utcDate.getTime() - excelEpoch.getTime()) / (24 * 60 * 60 * 1000);
                 }
 
                 resultData.sort((a, b) => a.Position - b.Position);
@@ -150,7 +163,7 @@ async function processEvents() {
 
                         const lapTimes = Array(31).fill(''); // HS(LAP0)からLAP30まで、空文字列で初期化
                         let totalFinishTime = '';
-                        let lapCount = pilotLaps.length;
+                        let lapCount = pilotLaps.filter(lap => lap.LapNumber > 0).length;
                         
                         let bestLap = 999;
                         let consecutive2Lap = 999;
@@ -231,6 +244,17 @@ async function processEvents() {
                         updateBestTime('consecutive2Lap', consecutive2Lap, raceSerialTimestamp, raceName);
                         updateBestTime('consecutive3Lap', consecutive3Lap, raceSerialTimestamp, raceName);
 
+                        // Minimum Lap Ranking用データ収集
+                        pilotLaps.forEach(lap => {
+                            if (lap.LapNumber >= 1) {
+                                allValidLapTimes.push({
+                                    time: lap.LengthSeconds,
+                                    pilotName: pilot.Name,
+                                    heatName: raceName
+                                });
+                            }
+                        });
+
                         allResultsText += `  Position: ${result.Position}, Pilot: ${pilot.Name}, Points: ${result.Points}\n`;
                         const newRow = [
                             eventName,
@@ -264,6 +288,7 @@ async function processEvents() {
         const sanitizedRaceResults = sanitizeRaceResults(raceResults);
         await updateGoogleSheet(sanitizedRaceResults, lapsToDo);
         await updateAllRankingSheets(pilotBests, allPilots);
+        await updateMinLapRankingSheet(allValidLapTimes);
 
     } catch (err) {
         console.error('Error processing events:', err);
@@ -539,13 +564,6 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
     }
 }
 
-async function updateAllRankingSheets(pilotBests, allPilots) {
-    await updateSingleRankingSheet('bestLap', 'Best Lap', pilotBests, allPilots, 1);
-    await updateSingleRankingSheet('consecutive2Lap', 'Best 2-Lap', pilotBests, allPilots, 2);
-    await updateSingleRankingSheet('consecutive3Lap', 'Best 3-Lap', pilotBests, allPilots, 3);
-    await updateSingleRankingSheet('raceTime', 'Best Race Time', pilotBests, allPilots, 4);
-}
-
 async function updateSingleRankingSheet(categoryKey, sheetTitle, pilotBests, allPilots, index) {
     try {
         const spreadsheetId = config.google_spreadsheet_id;
@@ -807,6 +825,230 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, pilotBests, all
         );
 
         // --- batchUpdateの実行 ---
+        if (requests.length > 0) {
+            await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: { requests },
+            });
+        }
+
+        console.log(`Successfully updated Google Sheet "${sheetTitle}".`);
+    } catch (err) {
+        console.error(`Error updating ${sheetTitle} Sheet:`, err);
+    }
+}
+
+async function updateAllRankingSheets(pilotBests, allPilots) {
+    await updateSingleRankingSheet('bestLap', 'Best Lap', pilotBests, allPilots, 1);
+    await updateSingleRankingSheet('consecutive2Lap', 'Best 2-Lap', pilotBests, allPilots, 2);
+    await updateSingleRankingSheet('consecutive3Lap', 'Best 3-Lap', pilotBests, allPilots, 3);
+    await updateSingleRankingSheet('raceTime', 'Best Race Time', pilotBests, allPilots, 4);
+}
+
+async function updateMinLapRankingSheet(allLapTimes) {
+    console.log(`Starting to update Minimum Lap Ranking sheet with ${allLapTimes.length} laps...`);
+    try {
+        const spreadsheetId = config.google_spreadsheet_id;
+        const sheetTitle = 'Minimum Lap Ranking';
+        const index = 5; // 他のランキングシートの後ろ
+        const headers = ['Rank', 'Pilot', 'Time', 'HEAT'];
+
+        // データをタイムでソート
+        allLapTimes.sort((a, b) => a.time - b.time);
+        // 上位100件を抽出
+        const top100Laps = allLapTimes.slice(0, 100);
+
+        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
+        let sheet = spreadsheet.data.sheets.find(s => s.properties.title === sheetTitle);
+
+        const requests = [];
+
+        if (!sheet) {
+            console.log(`Sheet "${sheetTitle}" not found, creating it...`);
+            const addSheetRequest = {
+                addSheet: {
+                    properties: { title: sheetTitle, index: index },
+                },
+            };
+            const response = await sheets.spreadsheets.batchUpdate({
+                spreadsheetId,
+                resource: { requests: [addSheetRequest] },
+            });
+            const newSheetProp = response.data.replies[0].addSheet.properties;
+            sheet = { properties: newSheetProp };
+            console.log(`Sheet "${sheetTitle}" created with ID: ${sheet.properties.sheetId}.`);
+        } else {
+            const existingBands = sheet.bandedRanges || [];
+            if (existingBands.length > 0) {
+                const deleteRequests = existingBands.map(band => ({
+                    deleteBanding: {
+                        bandedRangeId: band.bandedRangeId
+                    }
+                }));
+                try {
+                    await sheets.spreadsheets.batchUpdate({
+                        spreadsheetId,
+                        resource: { requests: deleteRequests },
+                    });
+                } catch (err) {
+                    console.log(`Could not delete old banding, probably already gone. Error: ${err.message}`);
+                }
+            }
+        }
+
+        if (!sheet) {
+            console.error(`Failed to find or create sheet "${sheetTitle}".`);
+            return;
+        }
+        const sheetId = sheet.properties.sheetId;
+
+        requests.push({
+            updateSheetProperties: {
+                properties: { sheetId: sheetId, index: index },
+                fields: 'index'
+            }
+        });
+
+        requests.push({
+            updateCells: {
+                range: { sheetId: sheetId },
+                fields: "userEnteredValue,userEnteredFormat"
+            }
+        });
+
+        requests.push({
+            updateCells: {
+                rows: [{
+                    values: [{
+                        userEnteredValue: { stringValue: sheetTitle },
+                        userEnteredFormat: {
+                            textFormat: { fontSize: 14, bold: true },
+                            horizontalAlignment: 'CENTER'
+                        }
+                    }]
+                }],
+                start: { sheetId: sheetId, rowIndex: 0, columnIndex: 0 },
+                fields: "userEnteredValue,userEnteredFormat"
+            }
+        });
+
+        requests.push({
+            mergeCells: {
+                range: {
+                    sheetId: sheetId,
+                    startRowIndex: 0,
+                    endRowIndex: 1,
+                    startColumnIndex: 0,
+                    endColumnIndex: 4
+                },
+                mergeType: 'MERGE_ALL'
+            }
+        });
+
+        requests.push({
+            updateCells: {
+                rows: [{
+                    values: headers.map(header => ({
+                        userEnteredValue: { stringValue: header },
+                        userEnteredFormat: {
+                            backgroundColor: { red: 0.4, green: 0.4, blue: 0.4 },
+                            textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                            horizontalAlignment: 'RIGHT'
+                        }
+                    }))
+                }],
+                start: { sheetId: sheetId, rowIndex: 2, columnIndex: 0 },
+                fields: "userEnteredValue,userEnteredFormat"
+            }
+        });
+
+        if (top100Laps.length > 0) {
+            requests.push({
+                addBanding: {
+                    bandedRange: {
+                        range: {
+                            sheetId: sheetId,
+                            startRowIndex: 3,
+                            endRowIndex: 3 + top100Laps.length,
+                            startColumnIndex: 0,
+                            endColumnIndex: 4
+                        },
+                        rowProperties: {
+                            firstBandColor: { red: 0.9, green: 0.9, blue: 0.9 },
+                            secondBandColor: { red: 1, green: 1, blue: 1 }
+                        }
+                    }
+                }
+            });
+
+            const rows = top100Laps.map((item, index) => ({
+                values: [
+                    { userEnteredValue: { numberValue: index + 1 }, userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
+                    { userEnteredValue: { stringValue: item.pilotName }, userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
+                    {
+                        userEnteredValue: { numberValue: item.time },
+                        userEnteredFormat: {
+                            numberFormat: { type: 'NUMBER', pattern: '0.000' },
+                            horizontalAlignment: 'RIGHT'
+                        }
+                    },
+                    { userEnteredValue: { stringValue: item.heatName }, userEnteredFormat: { horizontalAlignment: 'RIGHT' } }
+                ]
+            }));
+            requests.push({
+                updateCells: {
+                    rows: rows,
+                    start: { sheetId: sheetId, rowIndex: 3, columnIndex: 0 },
+                    fields: "userEnteredValue,userEnteredFormat"
+                }
+            });
+        }
+
+        const borderRange = {
+            sheetId: sheetId,
+            startRowIndex: 0,
+            endRowIndex: 3 + top100Laps.length,
+            startColumnIndex: 0,
+            endColumnIndex: 4
+        };
+        requests.push(
+            { updateBorders: { range: borderRange, top: { style: 'SOLID', width: 1 } } },
+            { updateBorders: { range: borderRange, bottom: { style: 'SOLID', width: 1 } } },
+            { updateBorders: { range: borderRange, left: { style: 'SOLID', width: 1 } } },
+            { updateBorders: { range: borderRange, right: { style: 'SOLID', width: 1 } } }
+        );
+
+        requests.push(
+            {
+                updateDimensionProperties: {
+                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 },
+                    properties: { pixelSize: 50 }, // Rank
+                    fields: 'pixelSize'
+                }
+            },
+            {
+                updateDimensionProperties: {
+                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 },
+                    properties: { pixelSize: 150 }, // Pilot
+                    fields: 'pixelSize'
+                }
+            },
+            {
+                updateDimensionProperties: {
+                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 },
+                    properties: { pixelSize: 60 }, // Time
+                    fields: 'pixelSize'
+                }
+            },
+            {
+                updateDimensionProperties: {
+                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 },
+                    properties: { pixelSize: 80 }, // HEAT
+                    fields: 'pixelSize'
+                }
+            }
+        );
+
         if (requests.length > 0) {
             await sheets.spreadsheets.batchUpdate({
                 spreadsheetId,
