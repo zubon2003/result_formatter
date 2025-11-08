@@ -89,12 +89,16 @@ async function processEvents() {
                 const raceJsonPath = path.join(eventDir, raceDir, 'Race.json');
                 const resultJsonPath = path.join(eventDir, raceDir, 'Result.json');
 
-                if (fs.existsSync(raceJsonPath) && fs.existsSync(resultJsonPath)) {
+                if (fs.existsSync(raceJsonPath)) {
                     const raceData = JSON.parse(fs.readFileSync(raceJsonPath, 'utf8'));
-                    const resultData = JSON.parse(fs.readFileSync(resultJsonPath, 'utf8'));
+                    let resultData = null;
+                    if (fs.existsSync(resultJsonPath)) {
+                        resultData = JSON.parse(fs.readFileSync(resultJsonPath, 'utf8'));
+                    }
                     const round = roundsData.find(r => r.ID === raceData[0].Round);
                     races.push({
                         roundNumber: round ? round.RoundNumber : 0,
+                        eventType: round ? round.EventType : 'Race', // EventTypeを追加
                         raceNumber: raceData[0].RaceNumber,
                         raceData,
                         resultData
@@ -104,25 +108,20 @@ async function processEvents() {
 
             races.sort((a, b) => a.roundNumber - b.roundNumber || a.raceNumber - b.raceNumber);
 
-            const validRaces = races.filter(race => race.resultData && race.resultData.length > 0 && race.raceData[0].Valid === true);
+            const validRaces = races.filter(race => race.raceData[0].Valid === true);
 
             validRaces.forEach((race, index) => {
-                const { roundNumber, raceNumber, raceData, resultData } = race;
+                const { roundNumber, eventType, raceNumber, raceData, resultData } = race;
                 const displayRoundNumber = roundNumber === 0 ? 'N/A' : roundNumber;
                 
-                // resultDataからResultTypeを取得
-                const resultType = resultData[0] && resultData[0].ResultType ? resultData[0].ResultType : 'Race'; // デフォルトは'Race'
-                
-                const raceName = resultType + ' ' + displayRoundNumber + '-' + raceNumber; // ★変更
+                const raceName = eventType + ' ' + displayRoundNumber + '-' + raceNumber;
                 allResultsText += raceName + '\n';
 
-                // 最も小さいLapNumberのラップから日付とスタート時刻を取得
                 let raceSerialTimestamp = '';
                 const firstLap = raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
                 if (firstLap && firstLap.StartTime) {
                     const dateObj = new Date(firstLap.StartTime);
                     
-                    // ローカルタイムゾーンの年、月、日、時、分、秒を取得
                     const year = dateObj.getFullYear();
                     const month = dateObj.getMonth();
                     const day = dateObj.getDate();
@@ -130,19 +129,22 @@ async function processEvents() {
                     const minutes = dateObj.getMinutes();
                     const seconds = dateObj.getSeconds();
 
-                    // ローカル時刻の要素を使って、UTCとしてDateオブジェクトを再生成
                     const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
 
-                    // Google Sheetsのシリアル値に変換 (UTC基準)
                     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
                     raceSerialTimestamp = (utcDate.getTime() - excelEpoch.getTime()) / (24 * 60 * 60 * 1000);
                 }
 
-                resultData.sort((a, b) => a.Position - b.Position);
+                // Race.json の Detections からパイロットIDのリストを作成
+                const pilotIdsInRace = [...new Set(raceData[0].Detections.map(d => d.Pilot))];
 
-                resultData.forEach(result => {
-                    const pilot = pilotsData.find(p => p.ID === result.Pilot);
+                pilotIdsInRace.forEach(pilotId => {
+                    const pilot = pilotsData.find(p => p.ID === pilotId);
                     if (pilot) {
+                        // Result.json が存在すればPositionを取得、なければ空欄
+                        const result = resultData ? resultData.find(r => r.Pilot === pilotId) : null;
+                        const position = result ? result.Position : '';
+
                         if (!allPilots[pilot.ID]) {
                             allPilots[pilot.ID] = pilot.Name;
                         }
@@ -155,13 +157,12 @@ async function processEvents() {
                             };
                         }
 
-                        // ラップタイムの収集
                         const pilotLaps = raceData[0].Laps.filter(lap => {
                             const detection = raceData[0].Detections.find(d => d.ID === lap.Detection);
-                            return detection && detection.Pilot === result.Pilot && detection.Valid === true;
+                            return detection && detection.Pilot === pilotId && detection.Valid === true;
                         }).sort((a, b) => a.LapNumber - b.LapNumber);
 
-                        const lapTimes = Array(31).fill(''); // HS(LAP0)からLAP30まで、空文字列で初期化
+                        const lapTimes = Array(31).fill('');
                         let totalFinishTime = '';
                         let lapCount = pilotLaps.filter(lap => lap.LapNumber > 0).length;
                         
@@ -170,52 +171,39 @@ async function processEvents() {
                         let consecutive3Lap = 999;
                         let raceTimeXLap = 9999;
 
-                        // LAP1以上のラップタイムのみを抽出
                         const actualLapTimes = pilotLaps.filter(lap => lap.LapNumber >= 1).map(lap => lap.LengthSeconds);
 
                         if (pilotLaps.length > 0) {
-                            lapTimes[0] = pilotLaps[0].LengthSeconds; // HS(LAP0)
+                            lapTimes[0] = pilotLaps[0].LengthSeconds;
                             totalFinishTime = pilotLaps.reduce((sum, lap) => sum + lap.LengthSeconds, 0);
 
-                            // Best LAPの計算 (LAP1以上のラップから)
                             if (actualLapTimes.length > 0) {
                                 const minLap = Math.min(...actualLapTimes);
-                                if (isFinite(minLap)) {
-                                    bestLap = minLap;
-                                }
+                                if (isFinite(minLap)) bestLap = minLap;
                             }
 
-                            // 連続2周の計算 (LAP1以上のラップから)
                             if (actualLapTimes.length >= 2) {
                                 let min2Lap = Infinity;
                                 for (let i = 0; i < actualLapTimes.length - 1; i++) {
                                     min2Lap = Math.min(min2Lap, actualLapTimes[i] + actualLapTimes[i+1]);
                                 }
-                                if (isFinite(min2Lap)) {
-                                    consecutive2Lap = min2Lap;
-                                }
+                                if (isFinite(min2Lap)) consecutive2Lap = min2Lap;
                             }
 
-                            // 連続3周の計算 (LAP1以上のラップから)
                             if (actualLapTimes.length >= 3) {
                                 let min3Lap = Infinity;
                                 for (let i = 0; i < actualLapTimes.length - 2; i++) {
                                     min3Lap = Math.min(min3Lap, actualLapTimes[i] + actualLapTimes[i+1] + actualLapTimes[i+2]);
                                 }
-                                if (isFinite(min3Lap)) {
-                                    consecutive3Lap = min3Lap;
-                                }
+                                if (isFinite(min3Lap)) consecutive3Lap = min3Lap;
                             }
 
                             const hsLap = pilotLaps.find(lap => lap.LapNumber === 0);
-
                             if (hsLap) {
-                                // HSありの場合: HS(LAP0)からLAPxまで完走しているか
                                 if (pilotLaps.length >= lapsToDo + 1) {
                                     raceTimeXLap = pilotLaps.slice(0, lapsToDo + 1).reduce((sum, lap) => sum + lap.LengthSeconds, 0);
                                 }
                             } else {
-                                // HSなしの場合: LAP1からLAPxまで完走しているか
                                 if (pilotLaps.length >= lapsToDo) {
                                     raceTimeXLap = pilotLaps.slice(0, lapsToDo).reduce((sum, lap) => sum + lap.LengthSeconds, 0);
                                 }
@@ -244,7 +232,6 @@ async function processEvents() {
                         updateBestTime('consecutive2Lap', consecutive2Lap, raceSerialTimestamp, raceName);
                         updateBestTime('consecutive3Lap', consecutive3Lap, raceSerialTimestamp, raceName);
 
-                        // Minimum Lap Ranking用データ収集
                         pilotLaps.forEach(lap => {
                             if (lap.LapNumber >= 1) {
                                 allValidLapTimes.push({
@@ -255,27 +242,27 @@ async function processEvents() {
                             }
                         });
 
-                        allResultsText += `  Position: ${result.Position}, Pilot: ${pilot.Name}, Points: ${result.Points}\n`;
+                        allResultsText += `  Pilot: ${pilot.Name}\n`;
                         const newRow = [
                             eventName,
                             raceName,
-                            raceSerialTimestamp, // 日付用
-                            raceSerialTimestamp, // 時刻用
+                            raceSerialTimestamp,
+                            raceSerialTimestamp,
                             pilot.Name,
-                            result.Position,
-                            lapCount, // Lap数
-                            totalFinishTime, // Finish time
+                            position,
+                            lapCount,
+                            totalFinishTime,
                             raceTimeXLap,
                             bestLap,
                             consecutive2Lap,
                             consecutive3Lap,
-                            ...lapTimes // HS(LAP0)からLAP30まで
+                            ...lapTimes
                         ];
                         
                         raceResults.push(newRow);
-
                     }
                 });
+
                  if (index < validRaces.length - 1) {
                     allResultsText += '\n';
                 }
@@ -287,8 +274,7 @@ async function processEvents() {
         // Google Spreadsheetへの書き込み
         const sanitizedRaceResults = sanitizeRaceResults(raceResults);
         await updateGoogleSheet(sanitizedRaceResults, lapsToDo);
-        await updateAllRankingSheets(pilotBests, allPilots);
-        await updateMinLapRankingSheet(allValidLapTimes);
+        await updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes);
 
     } catch (err) {
         console.error('Error processing events:', err);
@@ -503,7 +489,7 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
 
         const columnWidths = [
             { index: 0, size: 150 }, // A
-            { index: 1, size: 80 },  // B
+            { index: 1, size: 130 },  // B
             { index: 2, size: 100 }, // C
             { index: 3, size: 100 }, // D
             { index: 4, size: 150 }, // E
@@ -564,7 +550,7 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
     }
 }
 
-async function updateSingleRankingSheet(categoryKey, sheetTitle, pilotBests, allPilots, index) {
+async function updateSingleRankingSheet(categoryKey, sheetTitle, sourceData, allPilots, index) {
     try {
         const spreadsheetId = config.google_spreadsheet_id;
 
@@ -616,23 +602,39 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, pilotBests, all
         const sheetId = sheet.properties.sheetId;
 
         // --- ランキングデータの作成とソート ---
-        let rankingData = Object.keys(pilotBests)
-            .map(pilotId => ({
-                pilotId: pilotId,
-                pilotName: allPilots[pilotId] || pilotId,
-                data: pilotBests[pilotId][categoryKey]
+        let rankingData;
+
+        if (categoryKey === 'minLap') {
+            // Minimum Lap Ranking の処理
+            sourceData.sort((a, b) => a.time - b.time);
+            rankingData = sourceData.slice(0, 100).map(item => ({
+                pilotName: item.pilotName,
+                data: {
+                    time: item.time,
+                    heatName: item.heatName
+                }
             }));
+        } else {
+            // 既存のランキング処理
+            rankingData = Object.keys(sourceData)
+                .map(pilotId => ({
+                    pilotId: pilotId,
+                    pilotName: allPilots[pilotId] || pilotId,
+                    data: sourceData[pilotId][categoryKey]
+                }));
 
-        rankingData.sort((a, b) => {
-            const timeA = a.data.time;
-            const timeB = b.data.time;
-            const timestampA = a.data.timestamp;
-            const timestampB = b.data.timestamp;
+            rankingData.sort((a, b) => {
+                const timeA = a.data.time;
+                const timeB = b.data.time;
+                const timestampA = a.data.timestamp;
+                const timestampB = b.data.timestamp;
 
-            if (timeA !== timeB) return timeA - timeB;
-            if (timestampA !== timestampB) return timestampA - timestampB;
-            return 0;
-        });
+                if (timeA !== timeB) return timeA - timeB;
+                if (timestampA !== timestampB) return timestampA - timestampB;
+                return 0;
+            });
+        }
+
 
         // --- シートの並び順を設定 ---
         requests.push({
@@ -817,7 +819,7 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, pilotBests, all
                         endIndex: 4
                     },
                     properties: {
-                        pixelSize: 80
+                        pixelSize: 130
                     },
                     fields: 'pixelSize'
                 }
@@ -838,228 +840,12 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, pilotBests, all
     }
 }
 
-async function updateAllRankingSheets(pilotBests, allPilots) {
+async function updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes) {
     await updateSingleRankingSheet('bestLap', 'Best Lap', pilotBests, allPilots, 1);
     await updateSingleRankingSheet('consecutive2Lap', 'Best 2-Lap', pilotBests, allPilots, 2);
     await updateSingleRankingSheet('consecutive3Lap', 'Best 3-Lap', pilotBests, allPilots, 3);
     await updateSingleRankingSheet('raceTime', 'Best Race Time', pilotBests, allPilots, 4);
-}
-
-async function updateMinLapRankingSheet(allLapTimes) {
-    console.log(`Starting to update Minimum Lap Ranking sheet with ${allLapTimes.length} laps...`);
-    try {
-        const spreadsheetId = config.google_spreadsheet_id;
-        const sheetTitle = 'Minimum Lap Ranking';
-        const index = 5; // 他のランキングシートの後ろ
-        const headers = ['Rank', 'Pilot', 'Time', 'HEAT'];
-
-        // データをタイムでソート
-        allLapTimes.sort((a, b) => a.time - b.time);
-        // 上位100件を抽出
-        const top100Laps = allLapTimes.slice(0, 100);
-
-        const spreadsheet = await sheets.spreadsheets.get({ spreadsheetId });
-        let sheet = spreadsheet.data.sheets.find(s => s.properties.title === sheetTitle);
-
-        const requests = [];
-
-        if (!sheet) {
-            console.log(`Sheet "${sheetTitle}" not found, creating it...`);
-            const addSheetRequest = {
-                addSheet: {
-                    properties: { title: sheetTitle, index: index },
-                },
-            };
-            const response = await sheets.spreadsheets.batchUpdate({
-                spreadsheetId,
-                resource: { requests: [addSheetRequest] },
-            });
-            const newSheetProp = response.data.replies[0].addSheet.properties;
-            sheet = { properties: newSheetProp };
-            console.log(`Sheet "${sheetTitle}" created with ID: ${sheet.properties.sheetId}.`);
-        } else {
-            const existingBands = sheet.bandedRanges || [];
-            if (existingBands.length > 0) {
-                const deleteRequests = existingBands.map(band => ({
-                    deleteBanding: {
-                        bandedRangeId: band.bandedRangeId
-                    }
-                }));
-                try {
-                    await sheets.spreadsheets.batchUpdate({
-                        spreadsheetId,
-                        resource: { requests: deleteRequests },
-                    });
-                } catch (err) {
-                    console.log(`Could not delete old banding, probably already gone. Error: ${err.message}`);
-                }
-            }
-        }
-
-        if (!sheet) {
-            console.error(`Failed to find or create sheet "${sheetTitle}".`);
-            return;
-        }
-        const sheetId = sheet.properties.sheetId;
-
-        requests.push({
-            updateSheetProperties: {
-                properties: { sheetId: sheetId, index: index },
-                fields: 'index'
-            }
-        });
-
-        requests.push({
-            updateCells: {
-                range: { sheetId: sheetId },
-                fields: "userEnteredValue,userEnteredFormat"
-            }
-        });
-
-        requests.push({
-            updateCells: {
-                rows: [{
-                    values: [{
-                        userEnteredValue: { stringValue: sheetTitle },
-                        userEnteredFormat: {
-                            textFormat: { fontSize: 14, bold: true },
-                            horizontalAlignment: 'CENTER'
-                        }
-                    }]
-                }],
-                start: { sheetId: sheetId, rowIndex: 0, columnIndex: 0 },
-                fields: "userEnteredValue,userEnteredFormat"
-            }
-        });
-
-        requests.push({
-            mergeCells: {
-                range: {
-                    sheetId: sheetId,
-                    startRowIndex: 0,
-                    endRowIndex: 1,
-                    startColumnIndex: 0,
-                    endColumnIndex: 4
-                },
-                mergeType: 'MERGE_ALL'
-            }
-        });
-
-        requests.push({
-            updateCells: {
-                rows: [{
-                    values: headers.map(header => ({
-                        userEnteredValue: { stringValue: header },
-                        userEnteredFormat: {
-                            backgroundColor: { red: 0.4, green: 0.4, blue: 0.4 },
-                            textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
-                            horizontalAlignment: 'RIGHT'
-                        }
-                    }))
-                }],
-                start: { sheetId: sheetId, rowIndex: 2, columnIndex: 0 },
-                fields: "userEnteredValue,userEnteredFormat"
-            }
-        });
-
-        if (top100Laps.length > 0) {
-            requests.push({
-                addBanding: {
-                    bandedRange: {
-                        range: {
-                            sheetId: sheetId,
-                            startRowIndex: 3,
-                            endRowIndex: 3 + top100Laps.length,
-                            startColumnIndex: 0,
-                            endColumnIndex: 4
-                        },
-                        rowProperties: {
-                            firstBandColor: { red: 0.9, green: 0.9, blue: 0.9 },
-                            secondBandColor: { red: 1, green: 1, blue: 1 }
-                        }
-                    }
-                }
-            });
-
-            const rows = top100Laps.map((item, index) => ({
-                values: [
-                    { userEnteredValue: { numberValue: index + 1 }, userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
-                    { userEnteredValue: { stringValue: item.pilotName }, userEnteredFormat: { horizontalAlignment: 'RIGHT' } },
-                    {
-                        userEnteredValue: { numberValue: item.time },
-                        userEnteredFormat: {
-                            numberFormat: { type: 'NUMBER', pattern: '0.000' },
-                            horizontalAlignment: 'RIGHT'
-                        }
-                    },
-                    { userEnteredValue: { stringValue: item.heatName }, userEnteredFormat: { horizontalAlignment: 'RIGHT' } }
-                ]
-            }));
-            requests.push({
-                updateCells: {
-                    rows: rows,
-                    start: { sheetId: sheetId, rowIndex: 3, columnIndex: 0 },
-                    fields: "userEnteredValue,userEnteredFormat"
-                }
-            });
-        }
-
-        const borderRange = {
-            sheetId: sheetId,
-            startRowIndex: 0,
-            endRowIndex: 3 + top100Laps.length,
-            startColumnIndex: 0,
-            endColumnIndex: 4
-        };
-        requests.push(
-            { updateBorders: { range: borderRange, top: { style: 'SOLID', width: 1 } } },
-            { updateBorders: { range: borderRange, bottom: { style: 'SOLID', width: 1 } } },
-            { updateBorders: { range: borderRange, left: { style: 'SOLID', width: 1 } } },
-            { updateBorders: { range: borderRange, right: { style: 'SOLID', width: 1 } } }
-        );
-
-        requests.push(
-            {
-                updateDimensionProperties: {
-                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 },
-                    properties: { pixelSize: 50 }, // Rank
-                    fields: 'pixelSize'
-                }
-            },
-            {
-                updateDimensionProperties: {
-                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 },
-                    properties: { pixelSize: 150 }, // Pilot
-                    fields: 'pixelSize'
-                }
-            },
-            {
-                updateDimensionProperties: {
-                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 },
-                    properties: { pixelSize: 60 }, // Time
-                    fields: 'pixelSize'
-                }
-            },
-            {
-                updateDimensionProperties: {
-                    range: { sheetId: sheetId, dimension: 'COLUMNS', startIndex: 3, endIndex: 4 },
-                    properties: { pixelSize: 80 }, // HEAT
-                    fields: 'pixelSize'
-                }
-            }
-        );
-
-        if (requests.length > 0) {
-            await sheets.spreadsheets.batchUpdate({
-                spreadsheetId,
-                resource: { requests },
-            });
-        }
-
-        console.log(`Successfully updated Google Sheet "${sheetTitle}".`);
-    } catch (err) {
-        console.error(`Error updating ${sheetTitle} Sheet:`, err);
-    }
+    await updateSingleRankingSheet('minLap', 'Minimum Lap Ranking', allValidLapTimes, null, 5);
 }
 
 
