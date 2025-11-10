@@ -51,8 +51,8 @@ async function processEvents() {
 
         console.log('Processing event IDs:', targetEventIds);
 
-        let allResultsText = '';
-        const raceResults = [];
+        let eventName = ''; // ここで初期化
+        const allRaceResults = []; // スプレッドシート用の絞り込みなしの結果
         let lapsToDo = 4; // Default laps
 
         const pilotBests = {};
@@ -74,10 +74,8 @@ async function processEvents() {
             const pilotsData = JSON.parse(fs.readFileSync(pilotsJsonPath, 'utf8'));
             const roundsData = JSON.parse(fs.readFileSync(roundsJsonPath, 'utf8'));
 
-            const eventName = eventData[0].Name;
+            eventName = eventData[0].Name; // eventNameを更新
             lapsToDo = eventData[0].Laps; // Get laps from event data
-
-            allResultsText += 'Event: ' + eventName + '\n\n';
 
             const raceDirs = fs.readdirSync(eventDir).filter(file => {
                 const raceDir = path.join(eventDir, file);
@@ -110,52 +108,34 @@ async function processEvents() {
 
             const validRaces = races.filter(race => race.raceData[0].Valid === true);
 
-            validRaces.forEach((race, index) => {
+            // --- ループ1: スプレッドシート用の全データを作成 ---
+            validRaces.forEach(race => {
                 const { roundNumber, eventType, raceNumber, raceData, resultData } = race;
                 const displayRoundNumber = roundNumber === 0 ? 'N/A' : roundNumber;
-                
                 const raceName = eventType + ' ' + displayRoundNumber + '-' + raceNumber;
-                allResultsText += raceName + '\n';
 
                 let raceSerialTimestamp = '';
                 const firstLap = raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
                 if (firstLap && firstLap.StartTime) {
                     const dateObj = new Date(firstLap.StartTime);
-                    
                     const year = dateObj.getFullYear();
                     const month = dateObj.getMonth();
                     const day = dateObj.getDate();
                     const hours = dateObj.getHours();
                     const minutes = dateObj.getMinutes();
                     const seconds = dateObj.getSeconds();
-
                     const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
-
                     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
                     raceSerialTimestamp = (utcDate.getTime() - excelEpoch.getTime()) / (24 * 60 * 60 * 1000);
                 }
 
-                // Race.json の Detections からパイロットIDのリストを作成
                 const pilotIdsInRace = [...new Set(raceData[0].Detections.map(d => d.Pilot))];
 
                 pilotIdsInRace.forEach(pilotId => {
                     const pilot = pilotsData.find(p => p.ID === pilotId);
                     if (pilot) {
-                        // Result.json が存在すればPositionを取得、なければ空欄
                         const result = resultData ? resultData.find(r => r.Pilot === pilotId) : null;
                         const position = result ? result.Position : '';
-
-                        if (!allPilots[pilot.ID]) {
-                            allPilots[pilot.ID] = pilot.Name;
-                        }
-                        if (!pilotBests[pilot.ID]) {
-                            pilotBests[pilot.ID] = {
-                                raceTime: { time: 9999, timestamp: null, heatName: null },
-                                bestLap: { time: 999, timestamp: null, heatName: null },
-                                consecutive2Lap: { time: 999, timestamp: null, heatName: null },
-                                consecutive3Lap: { time: 999, timestamp: null, heatName: null }
-                            };
-                        }
 
                         const pilotLaps = raceData[0].Laps.filter(lap => {
                             const detection = raceData[0].Detections.find(d => d.ID === lap.Detection);
@@ -181,7 +161,6 @@ async function processEvents() {
                                 const minLap = Math.min(...actualLapTimes);
                                 if (isFinite(minLap)) bestLap = minLap;
                             }
-
                             if (actualLapTimes.length >= 2) {
                                 let min2Lap = Infinity;
                                 for (let i = 0; i < actualLapTimes.length - 1; i++) {
@@ -189,7 +168,6 @@ async function processEvents() {
                                 }
                                 if (isFinite(min2Lap)) consecutive2Lap = min2Lap;
                             }
-
                             if (actualLapTimes.length >= 3) {
                                 let min3Lap = Infinity;
                                 for (let i = 0; i < actualLapTimes.length - 2; i++) {
@@ -216,6 +194,70 @@ async function processEvents() {
                             });
                         }
 
+                        const newRow = [
+                            eventName, raceName, raceSerialTimestamp, raceSerialTimestamp, pilot.Name, position,
+                            lapCount, totalFinishTime, raceTimeXLap, bestLap, consecutive2Lap, consecutive3Lap,
+                            ...lapTimes
+                        ];
+                        allRaceResults.push(newRow);
+                    }
+                });
+            });
+
+
+            // --- ループ2: Web表示用の絞り込んだデータを作成 ---
+            const filteredRaces = validRaces.filter(race => {
+                const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+                const leaderboardRound = config.leaderboard_round;
+                if (leaderboardRound === 'all') {
+                    return true; // すべてのラウンドを対象とする
+                }
+                return race.raceData[0].Round === leaderboardRound;
+            });
+
+            filteredRaces.forEach(race => {
+                const { roundNumber, eventType, raceNumber, raceData, resultData } = race;
+                const displayRoundNumber = roundNumber === 0 ? 'N/A' : roundNumber;
+                const raceName = eventType + ' ' + displayRoundNumber + '-' + raceNumber;
+
+                let raceSerialTimestamp = '';
+                const firstLap = raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
+                if (firstLap && firstLap.StartTime) {
+                    const dateObj = new Date(firstLap.StartTime);
+                    const year = dateObj.getFullYear();
+                    const month = dateObj.getMonth();
+                    const day = dateObj.getDate();
+                    const hours = dateObj.getHours();
+                    const minutes = dateObj.getMinutes();
+                    const seconds = dateObj.getSeconds();
+                    const utcDate = new Date(Date.UTC(year, month, day, hours, minutes, seconds));
+                    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+                    raceSerialTimestamp = (utcDate.getTime() - excelEpoch.getTime()) / (24 * 60 * 60 * 1000);
+                }
+
+                const pilotIdsInRace = [...new Set(raceData[0].Detections.map(d => d.Pilot))];
+
+                pilotIdsInRace.forEach(pilotId => {
+                    const pilot = pilotsData.find(p => p.ID === pilotId);
+                    if (pilot) {
+                        if (!allPilots[pilot.ID]) {
+                            allPilots[pilot.ID] = pilot.Name;
+                        }
+                        if (!pilotBests[pilot.ID]) {
+                            pilotBests[pilot.ID] = {
+                                raceTime: { time: 9999, timestamp: null, heatName: null },
+                                bestLap: { time: 999, timestamp: null, heatName: null },
+                                consecutive2Lap: { time: 999, timestamp: null, heatName: null },
+                                consecutive3Lap: { time: 999, timestamp: null, heatName: null },
+                                first1LapWithoutHs: { time: 999, timestamp: null, heatName: null },
+                                first2LapsWithoutHs: { time: 999, timestamp: null, heatName: null },
+                                first3LapsWithoutHs: { time: 999, timestamp: null, heatName: null },
+                                first1LapWithHs: { time: 999, timestamp: null, heatName: null },
+                                first2LapsWithHs: { time: 999, timestamp: null, heatName: null },
+                                first3LapsWithHs: { time: 999, timestamp: null, heatName: null }
+                            };
+                        }
+
                         const updateBestTime = (category, time, timestamp, heatName) => {
                             if (typeof time === 'number' && isFinite(time)) {
                                 const currentBest = pilotBests[pilot.ID][category];
@@ -226,6 +268,68 @@ async function processEvents() {
                                 }
                             }
                         };
+
+                        const pilotLaps = raceData[0].Laps.filter(lap => {
+                            const detection = raceData[0].Detections.find(d => d.ID === lap.Detection);
+                            return detection && detection.Pilot === pilotId && detection.Valid === true;
+                        }).sort((a, b) => a.LapNumber - b.LapNumber);
+
+                        let bestLap = 999;
+                        let consecutive2Lap = 999;
+                        let consecutive3Lap = 999;
+                        let raceTimeXLap = 9999;
+
+                        const actualLapTimes = pilotLaps.filter(lap => lap.LapNumber >= 1).map(lap => lap.LengthSeconds);
+                        const allLapTimesIncludingHs = pilotLaps.filter(lap => lap.LapNumber >= 0).map(lap => lap.LengthSeconds);
+
+                        if (pilotLaps.length > 0) {
+                            if (actualLapTimes.length > 0) {
+                                const minLap = Math.min(...actualLapTimes);
+                                if (isFinite(minLap)) bestLap = minLap;
+                            }
+                            if (actualLapTimes.length >= 2) {
+                                let min2Lap = Infinity;
+                                for (let i = 0; i < actualLapTimes.length - 1; i++) {
+                                    min2Lap = Math.min(min2Lap, actualLapTimes[i] + actualLapTimes[i+1]);
+                                }
+                                if (isFinite(min2Lap)) consecutive2Lap = min2Lap;
+                            }
+                            if (actualLapTimes.length >= 3) {
+                                let min3Lap = Infinity;
+                                for (let i = 0; i < actualLapTimes.length - 2; i++) {
+                                    min3Lap = Math.min(min3Lap, actualLapTimes[i] + actualLapTimes[i+1] + actualLapTimes[i+2]);
+                                }
+                                if (isFinite(min3Lap)) consecutive3Lap = min3Lap;
+                            }
+
+                            const hsLap = pilotLaps.find(lap => lap.LapNumber === 0);
+                            if (hsLap) {
+                                if (pilotLaps.length >= lapsToDo + 1) {
+                                    raceTimeXLap = pilotLaps.slice(0, lapsToDo + 1).reduce((sum, lap) => sum + lap.LengthSeconds, 0);
+                                }
+                            } else {
+                                if (pilotLaps.length >= lapsToDo) {
+                                    raceTimeXLap = pilotLaps.slice(0, lapsToDo).reduce((sum, lap) => sum + lap.LengthSeconds, 0);
+                                }
+                            }
+                        }
+
+                        if (actualLapTimes.length >= 1) updateBestTime('first1LapWithoutHs', actualLapTimes[0], raceSerialTimestamp, raceName);
+                        if (actualLapTimes.length >= 2) updateBestTime('first2LapsWithoutHs', actualLapTimes[0] + actualLapTimes[1], raceSerialTimestamp, raceName);
+                        if (actualLapTimes.length >= 3) updateBestTime('first3LapsWithoutHs', actualLapTimes[0] + actualLapTimes[1] + actualLapTimes[2], raceSerialTimestamp, raceName);
+                        // First X LAPS (WITH HS) の計算 (B案のロジック)
+                        // first1LapWithHs = HS + LAP1
+                        if (allLapTimesIncludingHs.length >= 2) {
+                            updateBestTime('first1LapWithHs', allLapTimesIncludingHs[0] + allLapTimesIncludingHs[1], raceSerialTimestamp, raceName);
+                        }
+                        // first2LapsWithHs = HS + LAP1 + LAP2
+                        if (allLapTimesIncludingHs.length >= 3) {
+                            updateBestTime('first2LapsWithHs', allLapTimesIncludingHs[0] + allLapTimesIncludingHs[1] + allLapTimesIncludingHs[2], raceSerialTimestamp, raceName);
+                        }
+                        // first3LapsWithHs = HS + LAP1 + LAP2 + LAP3
+                        if (allLapTimesIncludingHs.length >= 4) {
+                            updateBestTime('first3LapsWithHs', allLapTimesIncludingHs[0] + allLapTimesIncludingHs[1] + allLapTimesIncludingHs[2] + allLapTimesIncludingHs[3], raceSerialTimestamp, raceName);
+                        }
 
                         updateBestTime('raceTime', raceTimeXLap, raceSerialTimestamp, raceName);
                         updateBestTime('bestLap', bestLap, raceSerialTimestamp, raceName);
@@ -241,40 +345,35 @@ async function processEvents() {
                                 });
                             }
                         });
-
-                        allResultsText += `  Pilot: ${pilot.Name}\n`;
-                        const newRow = [
-                            eventName,
-                            raceName,
-                            raceSerialTimestamp,
-                            raceSerialTimestamp,
-                            pilot.Name,
-                            position,
-                            lapCount,
-                            totalFinishTime,
-                            raceTimeXLap,
-                            bestLap,
-                            consecutive2Lap,
-                            consecutive3Lap,
-                            ...lapTimes
-                        ];
-                        
-                        raceResults.push(newRow);
                     }
                 });
-
-                 if (index < validRaces.length - 1) {
-                    allResultsText += '\n';
-                }
             });
         }
 
-        
+        // Google Spreadsheetへの書き込み (絞り込みなしのデータを使用)
+        // スタート時刻でソート (昇順)
+        allRaceResults.sort((a, b) => {
+            const timeA = a[2]; // スタート時刻のシリアル値
+            const timeB = b[2];
 
-        // Google Spreadsheetへの書き込み
-        const sanitizedRaceResults = sanitizeRaceResults(raceResults);
+            if (typeof timeA === 'number' && typeof timeB === 'number') {
+                return timeA - timeB;
+            } else if (typeof timeA !== 'number') {
+                return 1; // timeAが数値でない場合、bを先に
+            } else {
+                return -1; // timeBが数値でない場合、aを先に
+            }
+        });
+        const sanitizedRaceResults = sanitizeRaceResults(allRaceResults);
         await updateGoogleSheet(sanitizedRaceResults, lapsToDo);
+        
+        // ランキングシートの更新 (絞り込みありのデータを使用)
         await updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes);
+
+        // キャッシュを更新
+        cachedPilotBests = pilotBests;
+        cachedAllPilots = allPilots;
+        cachedEventName = eventName;
 
     } catch (err) {
         console.error('Error processing events:', err);
@@ -849,6 +948,11 @@ async function updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes) {
 }
 
 
+// グローバル変数としてキャッシュを定義
+let cachedPilotBests = {};
+let cachedAllPilots = {};
+let cachedEventName = '';
+
 // 初期実行
 processEvents();
 
@@ -906,7 +1010,19 @@ const server = http.createServer((req, res) => {
             req.on('end', () => {
                 try {
                     const newConfig = JSON.parse(body);
-                    fs.writeFile(path.join(__dirname, 'config.json'), JSON.stringify(newConfig, null, 2), 'utf8', (err) => {
+                    // 既存のconfigを読み込み、新しい設定で上書きする
+                    const currentConfig = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+                    const updatedConfig = { ...currentConfig, ...newConfig };
+
+                    // 新しい設定項目にデフォルト値を設定（もしnewConfigに含まれていなければ）
+                    if (updatedConfig.leaderboard_round === undefined) {
+                        updatedConfig.leaderboard_round = "all";
+                    }
+                    if (updatedConfig.sorted_by === undefined) {
+                        updatedConfig.sorted_by = "bestLap";
+                    }
+
+                    fs.writeFile(path.join(__dirname, 'config.json'), JSON.stringify(updatedConfig, null, 2), 'utf8', (err) => {
                         if (err) {
                             res.writeHead(500, { 'Content-Type': 'application/json' });
                             res.end(JSON.stringify({ error: 'Failed to write config.json' }));
@@ -955,6 +1071,173 @@ const server = http.createServer((req, res) => {
                     res.writeHead(500, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ error: 'Failed to load events' }));
                 });
+        } else {
+            res.writeHead(405);
+            res.end('Method Not Allowed');
+        }
+    }
+    else if (req.url === '/api/rounds') {
+        if (req.method === 'GET') {
+            fs.readFile(path.join(__dirname, 'config.json'), 'utf8', async (err, configData) => {
+                if (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to read config.json' }));
+                    return;
+                }
+                const config = JSON.parse(configData);
+                const selectedEventId = config.selected_event_id;
+                const fpvtrackside_dir_path = config.fpvtrackside_dir_path;
+                const eventsDir = path.join(fpvtrackside_dir_path, 'events').replace(/\\/g, '/');
+
+                if (!selectedEventId || selectedEventId === 'all') {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify([{ id: 'all', name: 'すべてのラウンド' }]));
+                    return;
+                }
+
+                try {
+                    const eventDir = path.join(eventsDir, selectedEventId);
+                    const roundsJsonPath = path.join(eventDir, 'Rounds.json');
+
+                    if (!fs.existsSync(roundsJsonPath)) {
+                        res.writeHead(200, { 'Content-Type': 'application/json' });
+                        res.end(JSON.stringify([{ id: 'all', name: 'すべてのラウンド' }]));
+                        return;
+                    }
+
+                    const roundsData = JSON.parse(await fs.promises.readFile(roundsJsonPath, 'utf8'));
+                    const rounds = roundsData
+                        .filter(round => round.Valid === true) // Validがtrueのラウンドのみをフィルター
+                        .map(round => ({
+                            id: round.ID,
+                            name: `${round.EventType}Round${round.RoundNumber}` // 表示形式を変更
+                        }));
+
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify(rounds));
+
+                } catch (error) {
+                    console.error('Error loading rounds:', error);
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to load rounds' }));
+                }
+            });
+        } else {
+            res.writeHead(405);
+            res.end('Method Not Allowed');
+        }
+    }
+    else if (req.url === '/leaderboard') {
+        fs.readFile(path.join(__dirname, 'leaderboard.html'), (err, data) => {
+            if (err) {
+                res.writeHead(500);
+                res.end('Error loading leaderboard.html');
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(data);
+        });
+    }
+    else if (req.url === '/api/leaderboard') {
+        if (req.method === 'GET') {
+            fs.readFile(path.join(__dirname, 'config.json'), 'utf8', async (err, configData) => {
+                if (err) {
+                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Failed to read config.json' }));
+                    return;
+                }
+                const config = JSON.parse(configData);
+                const selectedEventId = config.selected_event_id;
+                const leaderboardRound = config.leaderboard_round;
+                const sortedBy = config.sorted_by;
+
+                // キャッシュされたデータを使用
+                const pilotBests = cachedPilotBests;
+                const allPilots = cachedAllPilots;
+                const eventName = cachedEventName;
+
+                let roundName = 'すべてのラウンド'; // デフォルト値
+                if (leaderboardRound !== 'all' && selectedEventId !== 'all') {
+                    // config.selected_event_id と config.leaderboard_round に基づいてラウンド名を取得
+                    const fpvtrackside_dir_path = config.fpvtrackside_dir_path;
+                    const eventsDir = path.join(fpvtrackside_dir_path, 'events').replace(/\\/g, '/');
+                    try {
+                        const eventDir = path.join(eventsDir, selectedEventId);
+                        const roundsJsonPath = path.join(eventDir, 'Rounds.json');
+                        if (fs.existsSync(roundsJsonPath)) {
+                            const roundsData = JSON.parse(await fs.promises.readFile(roundsJsonPath, 'utf8'));
+                            const targetRound = roundsData.find(r => r.ID === leaderboardRound);
+                            if (targetRound) {
+                                roundName = `${targetRound.EventType}Round${targetRound.RoundNumber}`; // 表示形式を合わせる
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error getting round name for leaderboard:', e);
+                    }
+                }
+
+
+                // sortedBy の表示名
+                const sortedByDisplayNames = {
+                    "bestLap": "CONSECUTIVE 1 LAP (WITHOUT HS)",
+                    "consecutive2Lap": "CONSECUTIVE 2 LAPS (WITHOUT HS)",
+                    "consecutive3Lap": "CONSECUTIVE 3 LAPS (WITHOUT HS)",
+                    "raceTime": "Race Time",
+                    "first1LapWithoutHs": "First 1 LAP (WITHOUT HS)",
+                    "first2LapsWithoutHs": "First 2 LAPS (WITHOUT HS)",
+                    "first3LapsWithoutHs": "First 3 LAPS (WITHOUT HS)",
+                    "first1LapWithHs": "First 1 LAP (WITH HS)",
+                    "first2LapsWithHs": "First 2 LAPS (WITH HS)",
+                    "first3LapsWithHs": "First 3 LAPS (WITH HS)"
+                };
+                const sortedByDisplayName = sortedByDisplayNames[sortedBy] || sortedBy;
+
+
+                let ranking = [];
+
+                // sortedBy の値に基づいてランキングを生成
+                if (pilotBests && Object.keys(pilotBests).length > 0) {
+                    ranking = Object.keys(pilotBests)
+                        .map(pilotId => {
+                            const pilotName = allPilots[pilotId] || pilotId;
+                            const data = pilotBests[pilotId][sortedBy]; // sortedBy に対応するデータを取得
+
+                            // データが存在しない、または無効な場合はランキングから除外
+                            if (!data || typeof data.time !== 'number' || !isFinite(data.time) || data.time === 999 || data.time === 9999) {
+                                return null;
+                            }
+
+                            // leaderboardRound が 'all' でない場合、HeatName でフィルター
+                            // roundName は EventTypeRoundRoundnumber の形式
+                            // data.heatName は EventType RoundNumber-RaceNumber の形式
+                            // 例: TimeTrialRound3 と TimeTrial 3-1
+                            // 比較のために data.heatName を EventTypeRoundRoundnumber の形式に変換する必要がある
+                            const heatRoundName = data.heatName ? data.heatName.split(' ')[0] + 'Round' + data.heatName.split(' ')[1].split('-')[0] : '';
+
+                            if (leaderboardRound !== 'all' && heatRoundName !== roundName) {
+                                return null; // 選択されたラウンドと一致しない場合は除外
+                            }
+
+                            return {
+                                pilotId: pilotId,
+                                pilotName: pilotName,
+                                time: data.time,
+                                heatName: data.heatName
+                            };
+                        })
+                        .filter(item => item !== null) // 無効なデータをフィルタリング
+                        .sort((a, b) => a.time - b.time);
+                }
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    eventName: eventName,
+                    roundName: roundName,
+                    sortedByDisplayName: sortedByDisplayName,
+                    ranking: ranking
+                }));
+
+            });
         } else {
             res.writeHead(405);
             res.end('Method Not Allowed');
