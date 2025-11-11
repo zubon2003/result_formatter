@@ -51,6 +51,25 @@
                 <option value="all">すべてのイベント</option>
             </select>
 
+            <label for="leaderboard_round">Leaderboard対象ラウンド:</label>
+            <select id="leaderboard_round" name="leaderboard_round">
+                <option value="all">すべてのラウンド</option>
+            </select>
+
+            <label for="sorted_by">Leaderboardソート基準:</label>
+            <select id="sorted_by" name="sorted_by">
+                <option value="bestLap">CONSECUTIVE 1 LAP (WITHOUT HS)</option>
+                <option value="consecutive2Lap">CONSECUTIVE 2 LAPS (WITHOUT HS)</option>
+                <option value="consecutive3Lap">CONSECUTIVE 3 LAPS (WITHOUT HS)</option>
+                <option value="raceTime">Race Time</option>
+                <option value="first1LapWithoutHs">First 1 LAP (WITHOUT HS)</option>
+                <option value="first2LapsWithoutHs">First 2 LAPS (WITHOUT HS)</option>
+                <option value="first3LapsWithoutHs">First 3 LAPS (WITHOUT HS)</option>
+                <option value="first1LapWithHs">First 1 LAP (WITH HS)</option>
+                <option value="first2LapsWithHs">First 2 LAPS (WITH HS)</option>
+                <option value="first3LapsWithHs">First 3 LAPS (WITH HS)</option>
+            </select>
+
             <button type="submit">設定を保存</button>
         </form>
         <div id="message" class="message"></div>
@@ -61,9 +80,12 @@
             const form = document.getElementById('configForm');
             const messageDiv = document.getElementById('message');
             const eventSelect = document.getElementById('selected_event_id');
+            const leaderboardRoundSelect = document.getElementById('leaderboard_round');
+            const sortedBySelect = document.getElementById('sorted_by');
 
             // イベントリストを読み込み
             const loadEvents = () => {
+                console.log('loadEvents called'); // ★追加
                 // 既存のオプションをクリア（"すべてのイベント"以外）
                 while (eventSelect.children.length > 1) {
                     eventSelect.removeChild(eventSelect.lastChild);
@@ -72,13 +94,22 @@
                 fetch('/api/events')
                     .then(response => response.json())
                     .then(events => {
+                        console.log('API /api/events response:', events); // ★追加
                         events.forEach(event => {
                             const option = document.createElement('option');
                             option.value = event.id;
                             option.textContent = event.name;
                             eventSelect.appendChild(option);
                         });
-                        // 設定読み込み後に選択状態を反映するため、ここでは選択しない
+                        // イベントがロードされたら、configから選択状態を反映
+                        fetch('/api/config') // 最新のconfigをここで取得
+                            .then(response => response.json())
+                            .then(config => {
+                                console.log('Config loaded in loadEvents:', config); // ★追加
+                                eventSelect.value = config.selected_event_id || 'all';
+                                console.log('eventSelect.value set to:', eventSelect.value); // ★追加
+                                loadRounds(); // イベントが設定された後にラウンドをロード
+                            });
                     })
                     .catch(error => {
                         console.error('Error loading events:', error);
@@ -86,13 +117,111 @@
                     });
             };
 
+            // ラウンドリストを読み込み
+            const loadRounds = () => { // config 引数を削除
+                console.log('loadRounds called'); // ★追加
+                // 既存のオプションをクリア（"すべてのラウンド"以外）
+                while (leaderboardRoundSelect.children.length > 1) {
+                    leaderboardRoundSelect.removeChild(leaderboardRoundSelect.lastChild);
+                }
+
+                fetch('/api/rounds')
+                    .then(response => response.json())
+                    .then(rounds => {
+                        console.log('API /api/rounds response:', rounds); // ★追加
+                        rounds.forEach(round => {
+                            const option = document.createElement('option');
+                            option.value = round.id;
+                            option.textContent = round.name;
+                            leaderboardRoundSelect.appendChild(option);
+                        });
+                        // 設定読み込み後に選択状態を反映
+                        fetch('/api/config') // 最新のconfigをここで取得
+                            .then(response => response.json())
+                            .then(config => {
+                                console.log('Config loaded in loadRounds:', config); // ★追加
+                                if (config && config.leaderboard_round) {
+                                    leaderboardRoundSelect.value = config.leaderboard_round;
+                                } else {
+                                    leaderboardRoundSelect.value = 'all';
+                                }
+                                console.log('leaderboardRoundSelect.value set to:', leaderboardRoundSelect.value); // ★追加
+                            });
+                    })
+                    .catch(error => {
+                        console.error('Error loading rounds:', error);
+                        // エラーメッセージを表示
+                    });
+            };
+
             // ページロード時にイベントを読み込み
-            loadEvents();
+            loadEvents(); // ここでイベントとラウンドのロードを開始
 
             // ドロップダウンがフォーカスされたときにイベントを再読み込み
             eventSelect.addEventListener('focus', loadEvents);
+            // selected_event_id が変更されたら、設定を保存し、ラウンドリストを再読み込み
+            eventSelect.addEventListener('change', async () => { // asyncを追加
+                const newConfig = {
+                    selected_event_id: eventSelect.value,
+                    leaderboard_round: 'all' // イベントを変更したら、ラウンド選択は「すべて」にリセット
+                };
 
-            // 現在の設定を読み込み
+                try {
+                    const response = await fetch('/api/config', { // awaitを追加
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newConfig)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Failed to save config');
+                    }
+                    
+                    await response.json(); // レスポンスボディを読み切るまで待つ
+
+                    console.log('Event selection saved, reloading data and rounds...');
+                    // この時点でサーバー側のconfig.jsonは更新されているはずなので、
+                    // ラウンドリストを更新する
+                    loadRounds(); 
+
+                } catch (error) {
+                    console.error('Error on event change:', error);
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = 'イベントの切り替え中にエラーが発生しました。';
+                }
+            });
+
+            // ドロップダウンがフォーカスされたときにラウンドを再読み込み
+            leaderboardRoundSelect.addEventListener('focus', loadRounds);
+
+            // leaderboard_round が変更されたら即座に保存
+            leaderboardRoundSelect.addEventListener('change', () => {
+                const newConfig = {
+                    leaderboard_round: leaderboardRoundSelect.value
+                };
+                fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(newConfig)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error saving leaderboard_round:', data.error);
+                        // エラーメッセージを表示
+                    } else {
+                        console.log('leaderboard_round saved successfully.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error saving leaderboard_round:', error);
+                    // エラーメッセージを表示
+                });
+            });
+
+            // 現在の設定を読み込み (fpvtrackside_dir_path, google_spreadsheet_id, web_ui_port, sorted_by のみ)
             fetch('/api/config')
                 .then(response => response.json())
                 .then(config => {
@@ -101,7 +230,8 @@
                     const webUiPortInput = document.getElementById('web_ui_port');
                     webUiPortInput.value = config.web_ui_port || '';
                     webUiPortInput.dataset.originalValue = config.web_ui_port || ''; // ★追加
-                    eventSelect.value = config.selected_event_id || 'all'; // ★選択状態を反映
+                    // eventSelect.value = config.selected_event_id || 'all'; // この行は loadEvents 内に移動
+                    sortedBySelect.value = config.sorted_by || 'bestLap'; // ★追加
                 })
                 .catch(error => {
                     console.error('Error loading config:', error);
@@ -117,7 +247,9 @@
                     fpvtrackside_dir_path: document.getElementById('fpvtrackside_dir_path').value,
                     google_spreadsheet_id: document.getElementById('google_spreadsheet_id').value,
                     web_ui_port: parseInt(document.getElementById('web_ui_port').value, 10),
-                    selected_event_id: eventSelect.value // ★選択されたイベントIDを送信
+                    selected_event_id: eventSelect.value, // ★選択されたイベントIDを送信
+                    leaderboard_round: leaderboardRoundSelect.value, // ★追加
+                    sorted_by: sortedBySelect.value // ★追加
                 };
 
                 fetch('/api/config', {
