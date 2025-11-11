@@ -350,7 +350,17 @@ async function processEvents() {
             });
         }
 
-        // Google Spreadsheetへの書き込み (絞り込みなしのデータを使用)
+        // 1. Webキャッシュを先に更新
+        cachedPilotBests = pilotBests;
+        cachedAllPilots = allPilots;
+        cachedEventName = eventName;
+        console.log('Web UI cache has been updated.');
+
+        // 2. ランキングシートを更新
+        await updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes);
+        console.log('Ranking sheets have been updated.');
+        
+        // 3. RaceResultシートを更新 (時間のかかる処理)
         // スタート時刻でソート (昇順)
         allRaceResults.sort((a, b) => {
             const timeA = a[2]; // スタート時刻のシリアル値
@@ -366,14 +376,7 @@ async function processEvents() {
         });
         const sanitizedRaceResults = sanitizeRaceResults(allRaceResults);
         await updateGoogleSheet(sanitizedRaceResults, lapsToDo);
-        
-        // ランキングシートの更新 (絞り込みありのデータを使用)
-        await updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes);
-
-        // キャッシュを更新
-        cachedPilotBests = pilotBests;
-        cachedAllPilots = allPilots;
-        cachedEventName = eventName;
+        console.log('RaceResult sheet has been updated.');
 
     } catch (err) {
         console.error('Error processing events:', err);
