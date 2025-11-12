@@ -137,8 +137,11 @@
             font-weight: 600; /* Matched with pilot-name */
         }
         
-        .last-heat {
-            color: #00A3FF; /* Blue for pilots in the last finished heat */
+        .pilot-name.last-heat {
+            color: #00A3FF; /* Pilot name is blue if in last heat */
+        }
+        .time.last-heat {
+            color: #00A3FF; /* Time is blue only if updated in last heat */
         }
         
         .message { margin-top: 22.5px; /* 15px * 1.5 */ padding: 15px; /* 10px * 1.5 */ border-radius: 6px; /* 4px * 1.5 */ text-align: center; }
@@ -257,10 +260,11 @@
                         const bestTimeFromLastHeat = item.heatName === lastHeatName;
 
                         if (wasInLastHeat) {
-                            pilotDiv.classList.add('last-heat');
-                            if (bestTimeFromLastHeat) {
-                                timeDiv.classList.add('last-heat');
-                            }
+                            pilotDiv.classList.add('last-heat'); // Pilot name is always blue if in last heat
+                        }
+                        // タイムがそのパイロットのベストタイムであり、かつ最後に飛行したヒートで記録されたタイムであれば青
+                        if (wasInLastHeat && item.isBestTime) { // isBestTime を使用
+                            timeDiv.classList.add('last-heat');
                         }
                         // --- END NEW LOGIC ---
 

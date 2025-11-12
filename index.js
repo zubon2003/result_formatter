@@ -212,6 +212,19 @@ async function processEvents() {
                 if (leaderboardRound === 'all') {
                     return true; // すべてのラウンドを対象とする
                 }
+                // 新しいオプションの処理
+                if (leaderboardRound === 'allRace' && race.eventType === 'Race') {
+                    return true;
+                }
+                if (leaderboardRound === 'allPractice' && race.eventType === 'Practice') {
+                    return true;
+                }
+                if (leaderboardRound === 'allTimeTrial' && race.eventType === 'TimeTrial') {
+                    return true;
+                }
+                if (leaderboardRound === 'allEndurance' && race.eventType === 'Endurance') {
+                    return true;
+                }
                 return race.raceData[0].Round === leaderboardRound;
             });
 
@@ -348,6 +361,36 @@ async function processEvents() {
                     }
                 });
             });
+
+            // 最後に飛行したヒートとパイロットを特定
+            let latestRaceTimestamp = 0;
+            let latestHeatName = null;
+            let pilotsInLatestHeat = new Set();
+
+            // filteredRaces を逆順にソートして、最新のレースから処理する
+            const sortedFilteredRaces = [...filteredRaces].sort((a, b) => {
+                const timeA = new Date(a.raceData[0].Laps.sort((x, y) => x.LapNumber - y.LapNumber)[0]?.StartTime || 0).getTime();
+                const timeB = new Date(b.raceData[0].Laps.sort((x, y) => x.LapNumber - y.LapNumber)[0]?.StartTime || 0).getTime();
+                return timeB - timeA; // 降順
+            });
+
+            if (sortedFilteredRaces.length > 0) {
+                const latestRace = sortedFilteredRaces[0];
+                const firstLapOfLatestRace = latestRace.raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
+                if (firstLapOfLatestRace && firstLapOfLatestRace.StartTime) {
+                    latestRaceTimestamp = new Date(firstLapOfLatestRace.StartTime).getTime();
+                    latestHeatName = latestRace.eventType + ' ' + (latestRace.roundNumber === 0 ? 'N/A' : latestRace.roundNumber) + '-' + latestRace.raceNumber;
+                    pilotsInLatestHeat = new Set(latestRace.raceData[0].Detections.map(d => d.Pilot));
+                }
+            }
+
+            // 1. Webキャッシュを先に更新
+            cachedPilotBests = pilotBests;
+            cachedAllPilots = allPilots;
+            cachedEventName = eventName;
+            cachedLastHeatName = latestHeatName; // 新しいキャッシュ変数
+            cachedLastHeatPilotIds = Array.from(pilotsInLatestHeat); // 新しいキャッシュ変数
+            console.log('Web UI cache has been updated.');
         }
 
         // 1. Webキャッシュを先に更新
@@ -955,6 +998,8 @@ async function updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes) {
 let cachedPilotBests = {};
 let cachedAllPilots = {};
 let cachedEventName = '';
+let cachedLastHeatName = null; // 新しいキャッシュ変数
+let cachedLastHeatPilotIds = []; // 新しいキャッシュ変数
 
 // 初期実行
 processEvents();
@@ -1116,8 +1161,17 @@ const server = http.createServer((req, res) => {
                             name: `${round.EventType}Round${round.RoundNumber}` // 表示形式を変更
                         }));
 
+                    // 新しい「すべてのXラウンド」オプションを追加
+                    const allEventTypeRounds = [
+                        { id: 'allRace', name: 'すべてのRaceラウンド' },
+                        { id: 'allPractice', name: 'すべてのPracticeラウンド' },
+                        { id: 'allTimeTrial', name: 'すべてのTimeTrialラウンド' },
+                        { id: 'allEndurance', name: 'すべてのEnduranceラウンド' }
+                    ];
+                    const responseRounds = [{ id: 'all', name: 'すべてのラウンド' }, ...allEventTypeRounds, ...rounds];
+
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify(rounds));
+                    res.end(JSON.stringify(responseRounds));
 
                 } catch (error) {
                     console.error('Error loading rounds:', error);
@@ -1161,21 +1215,32 @@ const server = http.createServer((req, res) => {
 
                 let roundName = 'すべてのラウンド'; // デフォルト値
                 if (leaderboardRound !== 'all' && selectedEventId !== 'all') {
-                    // config.selected_event_id と config.leaderboard_round に基づいてラウンド名を取得
-                    const fpvtrackside_dir_path = config.fpvtrackside_dir_path;
-                    const eventsDir = path.join(fpvtrackside_dir_path, 'events').replace(/\\/g, '/');
-                    try {
-                        const eventDir = path.join(eventsDir, selectedEventId);
-                        const roundsJsonPath = path.join(eventDir, 'Rounds.json');
-                        if (fs.existsSync(roundsJsonPath)) {
-                            const roundsData = JSON.parse(await fs.promises.readFile(roundsJsonPath, 'utf8'));
-                            const targetRound = roundsData.find(r => r.ID === leaderboardRound);
-                            if (targetRound) {
-                                roundName = `${targetRound.EventType}Round${targetRound.RoundNumber}`; // 表示形式を合わせる
+                    // 新しいオプションの表示名を設定
+                    const allEventTypeRoundNames = {
+                        'allRace': 'すべてのRaceラウンド',
+                        'allPractice': 'すべてのPracticeラウンド',
+                        'allTimeTrial': 'すべてのTimeTrialラウンド',
+                        'allEndurance': 'すべてのEnduranceラウンド'
+                    };
+                    if (allEventTypeRoundNames[leaderboardRound]) {
+                        roundName = allEventTypeRoundNames[leaderboardRound];
+                    } else {
+                        // config.selected_event_id と config.leaderboard_round に基づいてラウンド名を取得
+                        const fpvtrackside_dir_path = config.fpvtrackside_dir_path;
+                        const eventsDir = path.join(fpvtrackside_dir_path, 'events').replace(/\\/g, '/');
+                        try {
+                            const eventDir = path.join(eventsDir, selectedEventId);
+                            const roundsJsonPath = path.join(eventDir, 'Rounds.json');
+                            if (fs.existsSync(roundsJsonPath)) {
+                                const roundsData = JSON.parse(await fs.promises.readFile(roundsJsonPath, 'utf8'));
+                                const targetRound = roundsData.find(r => r.ID === leaderboardRound);
+                                if (targetRound) {
+                                    roundName = `${targetRound.EventType}Round${targetRound.RoundNumber}`; // 表示形式を合わせる
+                                }
                             }
+                        } catch (e) {
+                            console.error('Error getting round name for leaderboard:', e);
                         }
-                    } catch (e) {
-                        console.error('Error getting round name for leaderboard:', e);
                     }
                 }
 
@@ -1199,36 +1264,53 @@ const server = http.createServer((req, res) => {
                 let ranking = [];
 
                 // sortedBy の値に基づいてランキングを生成
-                if (pilotBests && Object.keys(pilotBests).length > 0) {
-                    ranking = Object.keys(pilotBests)
+                if (cachedPilotBests && Object.keys(cachedPilotBests).length > 0) {
+                    ranking = Object.keys(cachedPilotBests)
                         .map(pilotId => {
-                            const pilotName = allPilots[pilotId] || pilotId;
-                            const data = pilotBests[pilotId][sortedBy]; // sortedBy に対応するデータを取得
+                            const pilotName = cachedAllPilots[pilotId] || pilotId;
+                            const data = cachedPilotBests[pilotId][sortedBy];
 
                             // データが存在しない、または無効な場合はランキングから除外
                             if (!data || typeof data.time !== 'number' || !isFinite(data.time) || data.time === 999 || data.time === 9999) {
                                 return null;
                             }
 
-                            // leaderboardRound が 'all' でない場合、HeatName でフィルター
-                            // roundName は EventTypeRoundRoundnumber の形式
-                            // data.heatName は EventType RoundNumber-RaceNumber の形式
-                            // 例: TimeTrialRound3 と TimeTrial 3-1
-                            // 比較のために data.heatName を EventTypeRoundRoundnumber の形式に変換する必要がある
+                            // heatRoundName と heatEventType はここで一度だけ宣言
                             const heatRoundName = data.heatName ? data.heatName.split(' ')[0] + 'Round' + data.heatName.split(' ')[1].split('-')[0] : '';
+                            const heatEventType = data.heatName ? data.heatName.split(' ')[0] : '';
 
-                            if (leaderboardRound !== 'all' && heatRoundName !== roundName) {
-                                return null; // 選択されたラウンドと一致しない場合は除外
+                            if (leaderboardRound !== 'all') {
+                                // 「すべてのXラウンド」オプションの場合
+                                if (leaderboardRound === 'allRace' && heatEventType !== 'Race') {
+                                    return null;
+                                }
+                                if (leaderboardRound === 'allPractice' && heatEventType !== 'Practice') {
+                                    return null;
+                                }
+                                if (leaderboardRound === 'allTimeTrial' && heatEventType !== 'TimeTrial') {
+                                    return null;
+                                }
+                                if (leaderboardRound === 'allEndurance' && heatEventType !== 'Endurance') {
+                                    return null;
+                                }
+                                // 個別のラウンドIDが選択されている場合
+                                if (!leaderboardRound.startsWith('all') && heatRoundName !== roundName) {
+                                    return null;
+                                }
                             }
+
+                            // ここで新しいフラグを追加
+                            const isBestTime = (data.time === cachedPilotBests[pilotId][sortedBy].time);
 
                             return {
                                 pilotId: pilotId,
                                 pilotName: pilotName,
                                 time: data.time,
-                                heatName: data.heatName
+                                heatName: data.heatName,
+                                isBestTime: isBestTime
                             };
                         })
-                        .filter(item => item !== null) // 無効なデータをフィルタリング
+                        .filter(item => item !== null)
                         .sort((a, b) => a.time - b.time);
                 }
 
@@ -1237,7 +1319,9 @@ const server = http.createServer((req, res) => {
                     eventName: eventName,
                     roundName: roundName,
                     sortedByDisplayName: sortedByDisplayName,
-                    ranking: ranking
+                    ranking: ranking,
+                    lastHeatName: cachedLastHeatName,
+                    lastHeatPilotIds: cachedLastHeatPilotIds
                 }));
 
             });
