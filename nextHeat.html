@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next Heat</title>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #121212;
+            font-family: 'Segoe UI', 'Roboto', sans-serif;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: #FFFFFF;
+            font-size: 2.5em;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        h2 {
+            color: #FFFFFF; /* Changed to white */
+            font-size: 1.8em;
+            margin: 10px 0 0 0;
+        }
+
+        #pilot-display-area {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 50px;
+            width: 95%;
+        }
+
+        .pilot-container {
+            position: relative;
+            width: 480px;
+            height: 320px;
+            border-radius: 16px;
+            background-size: cover;
+            background-position: center;
+            background-color: #222; /* 画像がない場合の背景色 */
+        }
+
+        /* オーバーレイ画像を疑似要素で表示 */
+        .pilot-container::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url(/image.png);
+            background-size: 100% 100%;
+            border-radius: 16px;
+            pointer-events: none;
+        }
+
+        .text-overlay {
+            position: relative;
+            z-index: 2; /* ::after疑似要素より手前に表示 */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            /* Removed justify-content: space-between; to allow more flexible positioning */
+        }
+
+        .top-row {
+            padding: 20px;
+        }
+
+        .bottom-row {
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0) 100%);
+            padding: 60px 25px 20px 25px; /* Increased padding-top by 10px */
+            border-radius: 0 0 16px 16px;
+            transform: translateY(10px); /* Shifted down by 10px */
+            margin-top: auto; /* Push to the bottom */
+        }
+
+        .pilot-band {
+            background-color: transparent; /* Made transparent */
+            color: #FFFFFF;
+            padding: 8px 15px;
+            border-radius: 10px;
+            font-size: 1.8em; /* Matched with pilot-rank font-size */
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .pilot-name {
+            font-size: 2.2em;
+            font-weight: bold;
+            color: #FFFFFF;
+            line-height: 1.1;
+            margin-top: 10px; /* Added to move name and time down */
+        }
+
+        .no-heat {
+            text-align: center;
+            font-size: 2em;
+            color: #777;
+        }
+/* New CSS for rank and time */
+.pilot-container {
+    position: relative; /* Ensure relative positioning for absolute children */
+}
+
+.pilot-rank {
+    position: absolute;
+    top: 15px; /* Adjust as needed */
+    right: 15px; /* Adjust as needed */
+    background-color: transparent; /* Made transparent */
+    color: #FFFFFF; /* Changed to white for visibility on dark/transparent background */
+    padding: 5px 10px;
+    border-radius: 8px;
+    font-size: 2.2em; /* Matched with pilot-name font-size */
+    font-weight: bold;
+    z-index: 3; /* Ensure it's above other elements */
+}
+
+.pilot-time {
+    font-size: 1.8em; /* Slightly smaller than name, larger than band */
+    color: #E0E0E0; /* Slightly lighter color */
+    margin-top: 5px; /* Space below name */
+    font-weight: normal;
+    text-align: right; /* Right-align the time */
+}
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Next Heat</h1>
+        <h2 id="next-heat-name">Loading...</h2>
+    </div>
+
+    <div id="pilot-display-area">
+        <!-- Pilot containers will be inserted here -->
+    </div>
+
+    <div id="no-heat-message" class="no-heat" style="display: none;">
+        次のヒートはありません。
+    </div>
+
+    <script>
+        async function fetchNextHeat() {
+            try {
+                const response = await fetch('/api/leaderboard');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                const pilotDisplayArea = document.getElementById('pilot-display-area');
+                const noHeatMessage = document.getElementById('no-heat-message');
+                const header = document.querySelector('.header');
+
+                pilotDisplayArea.innerHTML = ''; // Clear previous data
+
+                if (data.nextHeatName && data.nextHeatPilots && data.nextHeatPilots.length > 0) {
+                    header.style.display = '';
+                    noHeatMessage.style.display = 'none';
+                    pilotDisplayArea.style.display = 'flex';
+
+                    document.getElementById('next-heat-name').textContent = data.nextHeatName;
+                    
+                    data.nextHeatPilots.forEach(pilot => {
+                        const container = document.createElement('div');
+                        container.className = 'pilot-container';
+                        
+                        const imageUrl = pilot.photopath 
+                            ? `/api/pilot_image?path=${encodeURIComponent(pilot.photopath)}` 
+                            : `/api/pilot_image?id=${encodeURIComponent(pilot.pilotId)}`;
+                        container.style.backgroundImage = `url(${imageUrl})`;
+
+                        const textOverlay = document.createElement('div');
+                        textOverlay.className = 'text-overlay';
+
+                        let topRowContent = `<div class="pilot-band">${pilot.band || 'N/A'}</div>`;
+                        if (pilot.rank !== null) {
+                            topRowContent += `<div class="pilot-rank">${getOrdinalSuffix(pilot.rank)}</div>`;
+                        }
+
+                        let bottomRowContent = `<div class="pilot-name">${pilot.pilotName || 'N/A'}</div>`;
+                        if (pilot.time !== null) {
+                            bottomRowContent += `<div class="pilot-time">Best time: ${pilot.time.toFixed(3)} sec.</div>`;
+                        }
+
+                        textOverlay.innerHTML = `
+                            <div class="top-row">
+                                ${topRowContent}
+                            </div>
+                            <div class="bottom-row">
+                                ${bottomRowContent}
+                            </div>
+                        `;
+                        
+                        container.appendChild(textOverlay);
+                        pilotDisplayArea.appendChild(container);
+                    });
+
+                } else {
+                    header.style.display = 'none';
+                    pilotDisplayArea.style.display = 'none';
+                    noHeatMessage.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Error fetching next heat data:', error);
+                const noHeatMessage = document.getElementById('no-heat-message');
+                noHeatMessage.textContent = 'Error loading data.';
+                noHeatMessage.style.display = 'block';
+            }
+        }
+
+        // Fetch data on page load and then every 5 seconds
+        fetchNextHeat();
+        setInterval(fetchNextHeat, 5000);
+
+        // New function to add ordinal suffixes
+        function getOrdinalSuffix(n) {
+            if (typeof n !== 'number' || !Number.isInteger(n)) {
+                return n; // Return as is if not an integer
+            }
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+    </script>
+</body>
+</html>
+
+

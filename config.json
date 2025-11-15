@@ -2,5 +2,7 @@
   "fpvtrackside_dir_path": "",
   "google_spreadsheet_id": "",
   "web_ui_port": 8089,
-  "selected_event_id": "all"
+  "selected_event_id": "all",
+  "leaderboard_round": "all",
+  "sorted_by": "first2LapsWithoutHs"
 }

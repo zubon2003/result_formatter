@@ -263,7 +263,7 @@
                             pilotDiv.classList.add('last-heat'); // Pilot name is always blue if in last heat
                         }
                         // タイムがそのパイロットのベストタイムであり、かつ最後に飛行したヒートで記録されたタイムであれば青
-                        if (wasInLastHeat && item.isBestTime) { // isBestTime を使用
+                        if (wasInLastHeat && bestTimeFromLastHeat) {
                             timeDiv.classList.add('last-heat');
                         }
                         // --- END NEW LOGIC ---
