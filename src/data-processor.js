@@ -4,22 +4,10 @@ const { loadConfig, eventsDir } = require('./config');
 const { sanitizeRaceResults, updateGoogleSheet, updateAllRankingSheets } = require('./google-sheets');
 
 // メインの処理を関数としてラップ
-async function processEvents(updateCacheCallback) {
+async function processEvents() {
     try {
         const config = loadConfig(); // 処理開始時に最新のconfigを読み込む
         const selectedEventId = config.selected_event_id || 'all';
-
-        // --- Read GLOBAL Channels.json ---
-        const channelsJsonPath = path.join(eventsDir, '..', 'httpfiles', 'Channels.json');
-        const channelMap = new Map();
-        if (fs.existsSync(channelsJsonPath)) {
-            const channelsData = JSON.parse(fs.readFileSync(channelsJsonPath, 'utf8'));
-            channelsData.forEach(channel => {
-                channelMap.set(channel.ID, channel.DisplayName); // DisplayName を使用
-            });
-        } else {
-            console.warn(`Warning: Global Channels.json not found at ${channelsJsonPath}. Band info will be unavailable.`);
-        }
 
         const files = await fs.promises.readdir(eventsDir);
 
@@ -46,8 +34,7 @@ async function processEvents(updateCacheCallback) {
         const pilotBests = {};
         const allPilots = {};
         const allValidLapTimes = [];
-        
-        let pilotsInLatestHeat = new Set();
+
         const allRaces = []; // 全イベントの全レース情報を格納
 
         for (const eventId of targetEventIds) {
@@ -201,8 +188,8 @@ async function processEvents(updateCacheCallback) {
         });
 
 
-        // --- ループ2: Web表示用の絞り込んだデータを作成 ---
-        let currentConfig = loadConfig(); // ループ内で最新のconfigを取得
+        // --- ループ2: ランキングシート用にラウンドで絞り込んだデータを作成 ---
+        const currentConfig = loadConfig(); // 最新のconfigを取得
         const leaderboardRound = currentConfig.leaderboard_round;
 
         const filteredRaces = validRaces.filter(race => {
@@ -344,117 +331,7 @@ async function processEvents(updateCacheCallback) {
             });
         });
 
-        // --- latestHeatName と nextHeatName を決定する ---
-        const allFinishedRacesWithTime = validRaces.filter(r => {
-            return r.raceData[0].Laps && r.raceData[0].Laps.length > 0;
-        }).map(r => {
-            const firstLap = r.raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
-            return { race: r, startTime: firstLap ? new Date(firstLap.StartTime).getTime() : 0 };
-        }).sort((a, b) => b.startTime - a.startTime);
-
-
-        let latestRace = null;
-        let latestHeatName = null;
-        if (allFinishedRacesWithTime.length > 0) {
-            latestRace = allFinishedRacesWithTime[0].race;
-            latestHeatName = `${latestRace.eventType} ${latestRace.roundNumber === 0 ? 'N/A' : latestRace.roundNumber}-${latestRace.raceNumber}`;
-            pilotsInLatestHeat = new Set(latestRace.raceData[0].Detections.map(d => d.Pilot));
-        }
-
-        // --- Next Heat を決定するロジック ---
-        let nextHeatName = null;
-        let nextHeatPilots = [];
-        const findNextHeat = (startIndex) => {
-            for (let i = startIndex; i < allRaces.length; i++) {
-                const race = allRaces[i];
-                const isStarted = race.raceData[0].Laps && race.raceData[0].Laps.length > 0;
-                if (race.raceData[0].Valid === true && !isStarted) {
-                    return race; // レースオブジェクト全体を返す
-                }
-            }
-            return null;
-        };
-
-        let nextRace = null;
-        if (latestRace) {
-            const latestRaceIndex = allRaces.findIndex(r => r.id === latestRace.id);
-            if (latestRaceIndex !== -1) {
-                nextRace = findNextHeat(latestRaceIndex + 1);
-            } else {
-                nextRace = findNextHeat(0); // フォールバック
-            }
-        } else {
-            // 完了したValidなレースがない場合
-            nextRace = findNextHeat(0);
-        }
-
-        if (nextRace) {
-            nextHeatName = `${nextRace.eventType} ${nextRace.roundNumber === 0 ? 'N/A' : nextRace.roundNumber}-${nextRace.raceNumber}`;
-            const pilotsInRace = nextRace.raceData[0].PilotChannels; 
-            if (pilotsInRace) {
-                nextHeatPilots = pilotsInRace.map(racePilot => {
-                    const pilot = nextRace.pilotsData.find(p => p.ID === racePilot.Pilot);
-                    const bandInfo = channelMap.get(racePilot.Channel) || 'N/A';
-                    return {
-                        pilotId: pilot ? pilot.ID : null,
-                    pilotName: pilot ? pilot.Name : 'Unknown Pilot',
-                    photopath: pilot ? pilot.PhotoPath : null, // Added photopath
-                    band: bandInfo
-                    };
-                });
-            }
-        }
-
-        // --- Add Leaderboard data to nextHeatPilots ---
-        currentConfig = loadConfig(); // Get latest config for sorted_by
-        const sortedBy = currentConfig.sorted_by || 'bestLap'; // Default to bestLap
-
-        // Create a temporary ranking from pilotBests to determine ranks
-        let tempRanking = Object.keys(pilotBests)
-            .map(pilotId => {
-                const data = pilotBests[pilotId][sortedBy];
-                if (!data || typeof data.time !== 'number' || !isFinite(data.time) || data.time >= 999) {
-                    return null;
-                }
-                return { pilotId, time: data.time };
-            })
-            .filter(item => item !== null)
-            .sort((a, b) => a.time - b.time);
-
-        // Map pilotId to its rank and time for quick lookup
-        const pilotRankAndTimeMap = new Map();
-        tempRanking.forEach((item, index) => {
-            pilotRankAndTimeMap.set(item.pilotId, { rank: index + 1, time: item.time });
-        });
-
-        // Update nextHeatPilots with rank and time
-        nextHeatPilots = nextHeatPilots.map(pilot => {
-            const rankAndTime = pilotRankAndTimeMap.get(pilot.pilotId);
-            return {
-                ...pilot,
-                rank: rankAndTime ? rankAndTime.rank : null,
-                time: rankAndTime ? rankAndTime.time : null
-            };
-        });
-
-        
-
-        // --- Web表示を先に更新 ---
-        const webData = {
-            pilotBests,
-            allPilots,
-            eventName,
-            latestHeatName,
-            nextHeatName,
-            nextHeatPilots,
-            lastHeatPilotIds: Array.from(pilotsInLatestHeat)
-        };
-
-        if (updateCacheCallback) {
-            updateCacheCallback(webData);
-        }
-
-        // --- 時間のかかるGoogle Sheetの更新を後で行う ---
+        // --- Google Sheet の更新 ---
         await updateAllRankingSheets(pilotBests, allPilots, allValidLapTimes);
         console.log('Ranking sheets have been updated.');
         
@@ -475,10 +352,6 @@ async function processEvents(updateCacheCallback) {
 
     } catch (err) {
         console.error('Error processing events:', err);
-        // エラー時もコールバックを呼ぶことで、サーバーが古い情報を持ち続けないようにする（オプション）
-        if (updateCacheCallback) {
-            updateCacheCallback(null);
-        }
     }
 }
 

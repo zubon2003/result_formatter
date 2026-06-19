@@ -15,7 +15,6 @@ function loadConfig() {
             fpvtrackside_dir_path: '.',
             selected_event_id: 'all',
             leaderboard_round: 'all',
-            sorted_by: 'bestLap',
             google_spreadsheet_id: '',
             web_ui_port: 3000
         };
@@ -26,7 +25,6 @@ function loadConfig() {
             fpvtrackside_dir_path: '.',
             selected_event_id: 'all',
             leaderboard_round: 'all',
-            sorted_by: 'bestLap',
             google_spreadsheet_id: '',
             web_ui_port: 3000
         };

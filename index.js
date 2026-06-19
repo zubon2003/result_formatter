@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { eventsDir } = require('./src/config');
 const { processEvents } = require('./src/data-processor');
-const { startServer, updateCache } = require('./src/web-server');
+const { startServer } = require('./src/web-server');
 
 const DEBOUNCE_DELAY = 5000; // 5秒
 let debounceTimer;
@@ -17,8 +17,7 @@ async function run() {
     isProcessing = true;
     console.log('Starting to process events...');
     try {
-        // processEventsにWebキャッシュの更新を任せる
-        await processEvents(updateCache);
+        await processEvents();
         console.log('Processing finished successfully.');
     } catch (error) {
         console.error('An error occurred during processing:', error);
