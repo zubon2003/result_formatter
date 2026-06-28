@@ -1,0 +1,19 @@
+{
+  "fpvtrackside_dir_path": "C:/Users/<YOU>/AppData/Local/FPVTrackside",
+  "google_spreadsheet_id": "",
+  "web_ui_port": 8087,
+  "display_web_port": 8089,
+  "selected_event_id": "all",
+  "published_event_ids": [],
+  "web_unpublished_event_ids": [],
+  "leaderboard_round": "all",
+  "publish": {
+    "enabled": false,
+    "provider": "r2",
+    "endpoint": "https://<ACCOUNT_ID>.r2.cloudflarestorage.com",
+    "bucket": "",
+    "region": "auto",
+    "prefix": "",
+    "public_base_url": "https://pub-xxxx.r2.dev"
+  }
+}

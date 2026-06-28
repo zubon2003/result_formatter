@@ -1,0 +1,12 @@
+# 依存
+node_modules/
+
+# 個人設定・機密（公開しない）
+config.json
+credentials.json
+
+# 生成物・ローカル状態
+webdist/
+
+# ログ等
+*.log
