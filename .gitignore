@@ -5,6 +5,10 @@ node_modules/
 config.json
 credentials.json
 
+# バックアップ（アップデート対象外）
+config.json.bak
+*.bak
+
 # 生成物・ローカル状態
 webdist/
 
