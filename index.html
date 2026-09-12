@@ -46,9 +46,6 @@
             <label for="web_ui_port">設定UIポート（このページ）:</label>
             <input type="number" id="web_ui_port" name="web_ui_port" required data-original-value=""> <!-- ★追加 -->
 
-            <label for="display_web_port">表示用Webポート（結果ビュー）:</label>
-            <input type="number" id="display_web_port" name="display_web_port" data-original-value="">
-
             <label for="selected_event_id">処理するイベント:</label>
             <select id="selected_event_id" name="selected_event_id">
                 <option value="all">すべてのイベント</option>
@@ -62,22 +59,6 @@
                 <option value="allTimeTrial">すべてのTimeTrialラウンド</option>
                 <option value="allEndurance">すべてのEnduranceラウンド</option>
             </select>
-
-            <hr>
-            <label>公開イベント（保管 / Web）:</label>
-            <p style="font-size:12px;color:#666;margin:0 0 8px;font-weight:normal;">
-                「公開」=Webに表示／「Web非表示」=ローカル保管のみ(Webから隠す)／どちらも外す=非公開(保管しない)。公開とWeb非表示は排他です。
-            </p>
-            <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:15px;">
-                <thead>
-                    <tr style="color:#666;font-size:12px;border-bottom:1px solid #eee;">
-                        <th style="width:50px;">公開</th>
-                        <th style="width:80px;">Web非表示</th>
-                        <th style="text-align:left;">イベント</th>
-                    </tr>
-                </thead>
-                <tbody id="eventsTableBody"></tbody>
-            </table>
 
             <button type="submit">設定を保存</button>
         </form>
@@ -162,46 +143,8 @@
                     });
             };
 
-            // 公開イベント表(公開 / Web非表示)を読み込み
-            const loadEventsTable = () => {
-                Promise.all([
-                    fetch('/api/events').then(r => r.json()),
-                    fetch('/api/config').then(r => r.json())
-                ]).then(([events, config]) => {
-                    const pub = new Set(config.published_event_ids || []);
-                    const hide = new Set(config.web_unpublished_event_ids || []);
-                    const tbody = document.getElementById('eventsTableBody');
-                    tbody.innerHTML = '';
-                    events.forEach(ev => {
-                        const tr = document.createElement('tr');
-                        const isPub = pub.has(ev.id);
-                        const isHidden = hide.has(ev.id);
-                        const tdPub = document.createElement('td');
-                        tdPub.style.textAlign = 'center';
-                        const pubCb = document.createElement('input');
-                        pubCb.type = 'checkbox'; pubCb.className = 'pubCb'; pubCb.dataset.id = ev.id;
-                        pubCb.checked = isPub && !isHidden; pubCb.style.width = 'auto';
-                        tdPub.appendChild(pubCb);
-                        const tdHide = document.createElement('td');
-                        tdHide.style.textAlign = 'center';
-                        const hideCb = document.createElement('input');
-                        hideCb.type = 'checkbox'; hideCb.className = 'hideCb'; hideCb.dataset.id = ev.id;
-                        hideCb.checked = isPub && isHidden; hideCb.style.width = 'auto';
-                        tdHide.appendChild(hideCb);
-                        // 「公開」と「Web非表示」は排他 (両方ONにはしない)
-                        pubCb.addEventListener('change', () => { if (pubCb.checked) hideCb.checked = false; });
-                        hideCb.addEventListener('change', () => { if (hideCb.checked) pubCb.checked = false; });
-                        const tdName = document.createElement('td');
-                        tdName.textContent = ev.name;
-                        tr.appendChild(tdPub); tr.appendChild(tdHide); tr.appendChild(tdName);
-                        tbody.appendChild(tr);
-                    });
-                }).catch(error => console.error('Error loading events table:', error));
-            };
-
             // ページロード時にイベントを読み込み
             loadEvents(); // ここでイベントとラウンドのロードを開始
-            loadEventsTable();
 
             // ドロップダウンがフォーカスされたときにイベントを再読み込み
             eventSelect.addEventListener('focus', loadEvents);
@@ -276,9 +219,6 @@
                     const webUiPortInput = document.getElementById('web_ui_port');
                     webUiPortInput.value = config.web_ui_port || '';
                     webUiPortInput.dataset.originalValue = config.web_ui_port || ''; // ★追加
-                    const displayPortInput = document.getElementById('display_web_port');
-                    displayPortInput.value = config.display_web_port || '';
-                    displayPortInput.dataset.originalValue = config.display_web_port || '';
                     // eventSelect.value = config.selected_event_id || 'all'; // この行は loadEvents 内に移動
                 })
                 .catch(error => {
@@ -291,23 +231,12 @@
             form.addEventListener('submit', (event) => {
                 event.preventDefault();
 
-                const hiddenIds = Array.from(document.querySelectorAll('.hideCb'))
-                    .filter(c => c.checked).map(c => c.dataset.id);
-                // 「公開」も「Web非表示」も保管(=公開対象)には含める。Web非表示はそのうえで Web から隠す
-                const publishedSet = new Set(Array.from(document.querySelectorAll('.pubCb'))
-                    .filter(c => c.checked).map(c => c.dataset.id));
-                hiddenIds.forEach(id => publishedSet.add(id));
-                const publishedIds = Array.from(publishedSet);
-
                 const newConfig = {
                     fpvtrackside_dir_path: document.getElementById('fpvtrackside_dir_path').value,
                     google_spreadsheet_id: document.getElementById('google_spreadsheet_id').value,
                     web_ui_port: parseInt(document.getElementById('web_ui_port').value, 10),
-                    display_web_port: parseInt(document.getElementById('display_web_port').value, 10),
                     selected_event_id: eventSelect.value, // ★選択されたイベントIDを送信
-                    leaderboard_round: leaderboardRoundSelect.value, // ★追加
-                    published_event_ids: publishedIds,
-                    web_unpublished_event_ids: hiddenIds
+                    leaderboard_round: leaderboardRoundSelect.value // ★追加
                 };
 
                 fetch('/api/config', {
@@ -326,20 +255,16 @@
                         messageDiv.className = 'message success';
                         // ポートが変更されたかチェック
                         const webPortInput = document.getElementById('web_ui_port');
-                        const dispPortInput = document.getElementById('display_web_port');
                         const oldPort = parseInt(webPortInput.dataset.originalValue, 10);
                         const newPort = parseInt(webPortInput.value, 10);
-                        const oldDisp = parseInt(dispPortInput.dataset.originalValue, 10);
-                        const newDisp = parseInt(dispPortInput.value, 10);
 
-                        if (oldPort !== newPort || oldDisp !== newDisp) {
+                        if (oldPort !== newPort) {
                             messageDiv.textContent = '設定が正常に保存されました。ポートを変更した場合は、スクリプトを再起動してください。';
                         } else {
                             messageDiv.textContent = '設定が正常に保存されました。';
                         }
                         // 保存後、現在のポート値をoriginalValueに設定
                         webPortInput.dataset.originalValue = newPort;
-                        dispPortInput.dataset.originalValue = newDisp;
                     }
                 })
                 .catch(error => {

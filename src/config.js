@@ -9,10 +9,7 @@ const DEFAULTS = {
     fpvtrackside_dir_path: '',
     google_spreadsheet_id: '',
     web_ui_port: 8087,
-    display_web_port: 8089,
     selected_event_id: 'all',
-    published_event_ids: [],
-    web_unpublished_event_ids: [],
     leaderboard_round: 'all',
     // Minimum Lap Ranking シートに書き出す最大件数 (0 = 無制限)
     min_lap_ranking_limit: 0
@@ -59,18 +56,10 @@ const config = loadConfig();
 const eventsDir = path.join(config.fpvtrackside_dir_path, 'events').replace(/\\/g, '/');
 const credentialsPath = path.join(__dirname, '..', 'credentials.json');
 
-// 表示用 web (結果ビュー) のソース/出力ディレクトリと、設定UIとは別のポート
-const webSrcDir = path.join(__dirname, '..', 'web');
-const webDistDir = path.join(__dirname, '..', 'webdist');
-const displayWebPort = config.display_web_port || 8089;
-
 module.exports = {
     loadConfig,
     config,
     eventsDir,
     credentialsPath,
-    configPath,
-    webSrcDir,
-    webDistDir,
-    displayWebPort
+    configPath
 };

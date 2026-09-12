@@ -10,8 +10,5 @@ credentials.json
 config.json.bak
 *.bak
 
-# 生成物・ローカル状態
-webdist/
-
 # ログ等
 *.log
