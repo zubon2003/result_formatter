@@ -15,16 +15,7 @@ const DEFAULTS = {
     web_unpublished_event_ids: [],
     leaderboard_round: 'all',
     // Minimum Lap Ranking シートに書き出す最大件数 (0 = 無制限)
-    min_lap_ranking_limit: 0,
-    publish: {
-        enabled: false,
-        provider: 'r2',
-        endpoint: '',
-        bucket: '',
-        region: 'auto',
-        prefix: '',
-        public_base_url: ''
-    }
+    min_lap_ranking_limit: 0
 };
 
 // FPVTrackside の標準データ場所 (Windows: %LOCALAPPDATA%\FPVTrackside)
@@ -36,9 +27,7 @@ function defaultFpvDir() {
 function withDefaults(parsed) {
     const merged = {
         ...DEFAULTS,
-        ...parsed,
-        // publish は項目欠落を防ぐため個別にもマージ
-        publish: { ...DEFAULTS.publish, ...((parsed && parsed.publish) || {}) }
+        ...parsed
     };
     // FPVTrackside ディレクトリが空欄なら標準の保存先に自動補完
     if (!merged.fpvtrackside_dir_path || !String(merged.fpvtrackside_dir_path).trim()) {

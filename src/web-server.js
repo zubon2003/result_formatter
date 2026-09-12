@@ -18,9 +18,9 @@ function startServer(reprocessCallback) {
                 res.writeHead(200, { 'Content-Type': 'text/html' });
                 res.end(data);
             } else if (pathname === '/api/config' && method === 'GET') {
-                const data = await fs.promises.readFile(configPath, 'utf8');
+                // config.json が無い/項目欠落でも、既定値で補完して返す
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(data);
+                res.end(JSON.stringify(loadConfig()));
             } else if (pathname === '/api/config' && method === 'POST') {
                 let body = '';
                 req.on('data', chunk => { body += chunk.toString(); });
@@ -92,33 +92,49 @@ function startServer(reprocessCallback) {
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(responseRounds));
             } else {
-                const filePath = path.join(baseDir, pathname);
-                const safeFilePath = path.resolve(filePath);
+                const baseRoot = path.resolve(baseDir);
+                const safeFilePath = path.resolve(path.join(baseDir, pathname));
 
-                // Security check to prevent path traversal
-                if (!safeFilePath.startsWith(path.resolve(baseDir))) {
+                // パストラバーサル対策 (baseDir の外は不可。末尾セパレータ付きで前方一致)
+                if (safeFilePath !== baseRoot && !safeFilePath.startsWith(baseRoot + path.sep)) {
                     console.warn(`[403] Forbidden access attempt to: ${pathname}`);
                     res.writeHead(403);
                     res.end('Forbidden');
                     return;
                 }
 
-                if (fs.existsSync(safeFilePath) && fs.statSync(safeFilePath).isFile()) {
-                    const ext = path.extname(safeFilePath).toLowerCase();
-                    const mimeTypes = {
-                        '.html': 'text/html',
-                        '.js': 'text/javascript',
-                        '.css': 'text/css',
-                        '.png': 'image/png',
-                        '.jpg': 'image/jpeg',
-                        '.jpeg': 'image/jpeg',
-                        '.gif': 'image/gif',
-                        '.svg': 'image/svg+xml',
-                        '.ico': 'image/x-icon'
-                    };
-                    const contentType = mimeTypes[ext] || 'application/octet-stream';
+                // 静的配信は「公開して良い拡張子」だけに限定する許可リスト方式。
+                // これにより credentials.json / config.json (= .json) は配信されない。
+                // さらにソース等を含むディレクトリと機密ファイルは明示的に拒否する。
+                // (設定UIは /api/* しか使わないので、静的配信を絞っても実害なし)
+                const mimeTypes = {
+                    '.html': 'text/html',
+                    '.js': 'text/javascript',
+                    '.css': 'text/css',
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.gif': 'image/gif',
+                    '.svg': 'image/svg+xml',
+                    '.ico': 'image/x-icon'
+                };
+                const ext = path.extname(safeFilePath).toLowerCase();
 
-                    res.writeHead(200, { 'Content-Type': contentType });
+                const rel = path.relative(baseRoot, safeFilePath).split(path.sep).join('/');
+                const firstSeg = rel.split('/')[0];
+                const blockedDirs = new Set(['src', 'node_modules', '.git', 'web', 'webdist']);
+                const blockedFiles = new Set(['config.json', 'credentials.json', 'package.json', 'package-lock.json']);
+                const isBlocked = blockedDirs.has(firstSeg) || blockedFiles.has(rel) || path.basename(rel).startsWith('.');
+
+                if (!mimeTypes[ext] || isBlocked) {
+                    console.warn(`[403] Forbidden static path: ${pathname}`);
+                    res.writeHead(403);
+                    res.end('Forbidden');
+                    return;
+                }
+
+                if (fs.existsSync(safeFilePath) && fs.statSync(safeFilePath).isFile()) {
+                    res.writeHead(200, { 'Content-Type': mimeTypes[ext] });
                     fs.createReadStream(safeFilePath).pipe(res);
                 } else {
                     console.log(`[404] Not Found: ${pathname}`);
