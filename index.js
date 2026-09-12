@@ -3,7 +3,6 @@ const path = require('path');
 const { eventsDir } = require('./src/config');
 const { processEvents } = require('./src/data-processor');
 const { startServer } = require('./src/web-server');
-const { startDisplayServer } = require('./src/display-server');
 
 const DEBOUNCE_DELAY = 3000; // 3秒 (変更が静まってから再生成)
 let debounceTimer;
@@ -72,9 +71,6 @@ function watchFiles() {
 function main() {
     // 設定UI(別ポート)を起動し、設定変更時のコールバックとして run を渡す
     startServer(run);
-
-    // 表示用 web (結果ビュー) を別ポートで配信
-    startDisplayServer();
 
     // 初回実行
     run();
