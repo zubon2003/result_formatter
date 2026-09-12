@@ -74,14 +74,6 @@ async function processEvents() {
             eventName = eventData[0].Name; // 最後に処理されたイベント名が使われる
             lapsToDo = eventData[0].Laps;
 
-            // Stages.json も同じパスで読む (web のステージ表示用)
-            let stagesData = [];
-            const stagesJsonPath = path.join(eventDir, 'Stages.json');
-            if (fs.existsSync(stagesJsonPath)) {
-                try { stagesData = JSON.parse(fs.readFileSync(stagesJsonPath, 'utf8')); }
-                catch (e) { console.warn(`Failed to read Stages.json (${eventId}): ${e.message}`); }
-            }
-
             const raceDirs = fs.readdirSync(eventDir).filter(file => {
                 const raceDir = path.join(eventDir, file);
                 return fs.statSync(raceDir).isDirectory();
