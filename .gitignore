@@ -3,6 +3,7 @@ node_modules/
 
 # 個人設定・機密（公開しない）
 config.json
+config - *.json
 credentials.json
 
 # バックアップ（アップデート対象外）

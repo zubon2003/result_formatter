@@ -1,7 +1,92 @@
 const fs = require('fs');
 const path = require('path');
-const { loadConfig, eventsDir } = require('./config');
+const { loadConfig, eventsDir, webSrcDir, webDistDir } = require('./config');
 const { sanitizeRaceResults, updateGoogleSheet, updateAllRankingSheets } = require('./google-sheets');
+const { exportWebMulti, slugify } = require('./web-export');
+const { publishWeb } = require('./publisher');
+
+// 1 イベント分の生データ(Event/Pilots/Rounds/Stages + races)を読む。
+// web の保管イベントを必要時だけ読み込むために使う。
+function readEventRaw(eventId) {
+    const dir = path.join(eventsDir, eventId);
+    const eventJson = path.join(dir, 'Event.json');
+    const pilotsJson = path.join(dir, 'Pilots.json');
+    const roundsJson = path.join(dir, 'Rounds.json');
+    if (!fs.existsSync(eventJson) || !fs.existsSync(pilotsJson) || !fs.existsSync(roundsJson)) return null;
+    try {
+        const eventData = JSON.parse(fs.readFileSync(eventJson, 'utf8'));
+        const pilotsData = JSON.parse(fs.readFileSync(pilotsJson, 'utf8'));
+        const roundsData = JSON.parse(fs.readFileSync(roundsJson, 'utf8'));
+        let stagesData = [];
+        const stagesJson = path.join(dir, 'Stages.json');
+        if (fs.existsSync(stagesJson)) {
+            try { stagesData = JSON.parse(fs.readFileSync(stagesJson, 'utf8')); } catch (e) { /* ignore */ }
+        }
+        const races = [];
+        for (const f of fs.readdirSync(dir)) {
+            const rd = path.join(dir, f);
+            if (!fs.statSync(rd).isDirectory()) continue;
+            const rj = path.join(rd, 'Race.json');
+            if (!fs.existsSync(rj)) continue;
+            const raceData = JSON.parse(fs.readFileSync(rj, 'utf8'));
+            let resultData = null;
+            const rs = path.join(rd, 'Result.json');
+            if (fs.existsSync(rs)) resultData = JSON.parse(fs.readFileSync(rs, 'utf8'));
+            races.push({ id: raceData[0].ID, raceData, resultData });
+        }
+        return { eventId, eventData, pilotsData, roundsData, stagesData, races };
+    } catch (e) {
+        console.warn(`readEventRaw failed (${eventId}): ${e.message}`);
+        return null;
+    }
+}
+
+// FPVTrackside の application settings (ShownDecimalPlaces) を読む。
+// プロファイル別 <dir>/data/<profile>/ProfileSettings.xml にあるので、
+// 最も最近更新された(=アクティブな)プロファイルの値を採用する。既定 2。
+function readShownDecimalPlaces() {
+    try {
+        const dataDir = path.join(path.dirname(eventsDir), 'data');
+        if (!fs.existsSync(dataDir)) return 2;
+        let best = null, bestM = -1;
+        for (const p of fs.readdirSync(dataDir)) {
+            const xml = path.join(dataDir, p, 'ProfileSettings.xml');
+            if (!fs.existsSync(xml)) continue;
+            const m = fs.statSync(xml).mtimeMs;
+            if (m > bestM) { bestM = m; best = xml; }
+        }
+        if (!best) return 2;
+        const mt = /<ShownDecimalPlaces>(\d+)<\/ShownDecimalPlaces>/.exec(fs.readFileSync(best, 'utf8'));
+        return mt ? parseInt(mt[1], 10) : 2;
+    } catch (e) { return 2; }
+}
+
+// RaceResult シートの "Race Time (XLap)" ヘッダに使う Lap 数を決める。
+// 複数イベント混在(selected_event_id='all')時に「最後に処理したイベント」依存で
+// ヘッダが変わる問題を避け、有効レースで最も多く使われている Lap 数を採用する。
+// (各レースの Race Time 値自体はレースごとの lapsToDo で計算済み。ここはラベルのみ)
+// 同数の場合は小さい方を選び、結果を決定的にする。
+function pickHeaderLaps(races, fallback) {
+    const counts = new Map();
+    for (const r of races) {
+        const n = r.lapsToDo;
+        if (typeof n !== 'number') continue;
+        counts.set(n, (counts.get(n) || 0) + 1);
+    }
+    let best = fallback, bestCount = -1;
+    for (const [n, c] of counts) {
+        if (c > bestCount || (c === bestCount && n < best)) { best = n; bestCount = c; }
+    }
+    return best;
+}
+
+// イベント名を安価に取得 (Event.json だけ読む)
+function readEventName(eventId) {
+    try {
+        const e = JSON.parse(fs.readFileSync(path.join(eventsDir, eventId, 'Event.json'), 'utf8'));
+        return (e[0] && e[0].Name) || '';
+    } catch (e) { return ''; }
+}
 
 // メインの処理を関数としてラップ
 async function processEvents() {
@@ -36,6 +121,7 @@ async function processEvents() {
         const allValidLapTimes = [];
 
         const allRaces = []; // 全イベントの全レース情報を格納
+        const eventRawById = {}; // web 出力用: イベントごとの生データ (同じ 1 パスで収集)
 
         for (const eventId of targetEventIds) {
             const eventDir = path.join(eventsDir, eventId);
@@ -54,6 +140,15 @@ async function processEvents() {
 
             eventName = eventData[0].Name; // 最後に処理されたイベント名が使われる
             lapsToDo = eventData[0].Laps;
+
+            // Stages.json も同じパスで読む (web のステージ表示用)
+            let stagesData = [];
+            const stagesJsonPath = path.join(eventDir, 'Stages.json');
+            if (fs.existsSync(stagesJsonPath)) {
+                try { stagesData = JSON.parse(fs.readFileSync(stagesJsonPath, 'utf8')); }
+                catch (e) { console.warn(`Failed to read Stages.json (${eventId}): ${e.message}`); }
+            }
+            eventRawById[eventId] = { eventId, eventData, pilotsData, roundsData, stagesData, races: [] };
 
             const raceDirs = fs.readdirSync(eventDir).filter(file => {
                 const raceDir = path.join(eventDir, file);
@@ -82,8 +177,78 @@ async function processEvents() {
                         eventName: eventData[0].Name,
                         lapsToDo: eventData[0].Laps
                     });
+                    // web 出力用にも同じデータを保持 (再読込しない)
+                    eventRawById[eventId].races.push({ id: raceData[0].ID, raceData, resultData });
                 }
             }
+        }
+
+        // --- 表示用 web の生成 ---
+        // モデル: 「保管は複数イベント、更新はアクティブ1イベントだけ」。
+        //   - published_event_ids が公開(保管)対象
+        //   - アクティブ(selected_event_id) は毎回再生成
+        //   - それ以外は出力が無ければ一度だけ生成、あれば保管(再生成しない)
+        try {
+            let publishedIds = Array.isArray(config.published_event_ids) ? config.published_event_ids.slice() : [];
+
+            if (!publishedIds.length) {
+                // フォールバック: selected / 最後に開いたイベントの 1 件
+                const sel = config.selected_event_id;
+                if (sel && sel !== 'all') publishedIds = [sel];
+                else {
+                    const list = Object.values(eventRawById);
+                    list.sort((a, b) => {
+                        const la = (a.eventData[0] && a.eventData[0].LastOpened) || '';
+                        const lb = (b.eventData[0] && b.eventData[0].LastOpened) || '';
+                        return String(lb).localeCompare(String(la));
+                    });
+                    if (list[0]) publishedIds = [list[0].eventId];
+                }
+            }
+
+            const activeId = (config.selected_event_id && config.selected_event_id !== 'all')
+                ? config.selected_event_id
+                : publishedIds[0];
+
+            // アクティブ(ライブ更新)イベントは必ず公開対象に含める
+            if (activeId && !publishedIds.includes(activeId)) publishedIds.unshift(activeId);
+
+            const used = new Set();
+            const specs = [];
+            for (const pid of publishedIds) {
+                const name = (eventRawById[pid] && eventRawById[pid].eventData[0] &&
+                    eventRawById[pid].eventData[0].Name) || readEventName(pid);
+
+                // 一意なスラッグ (config の並び順で安定)
+                let slug = slugify(name);
+                if (used.has(slug)) slug = slug + '-' + String(pid).slice(0, 6);
+                let n = 2;
+                while (used.has(slug)) slug = slugify(name) + '-' + (n++);
+                used.add(slug);
+
+                const outExists = fs.existsSync(path.join(webDistDir, slug, 'data', 'bundle.json'));
+                const isActive = (pid === activeId);
+
+                if (isActive || !outExists) {
+                    // 再生成: 既読(アクティブ)ならそれを、無ければオンデマンドで読む
+                    const raw = eventRawById[pid] || readEventRaw(pid);
+                    if (raw) specs.push({ slug, name, eventId: pid, ev: raw });
+                } else {
+                    // 保管: 既存出力をそのまま使う
+                    specs.push({ slug, name, eventId: pid });
+                }
+            }
+
+            if (specs.length) {
+                const decimalPlaces = readShownDecimalPlaces();
+                exportWebMulti(specs, webSrcDir, webDistDir, decimalPlaces);
+                // 生成した webdist を外部ストレージへ公開 (設定が無ければ no-op)
+                await publishWeb(webDistDir);
+            } else {
+                console.warn('web-export: no target event found.');
+            }
+        } catch (e) {
+            console.error('web-export failed:', e);
         }
 
         // 全レースをラウンドとレース番号でソート
@@ -98,7 +263,7 @@ async function processEvents() {
             const raceName = eventType + ' ' + displayRoundNumber + '-' + raceNumber;
 
             let raceSerialTimestamp = '';
-            const firstLap = raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
+            const firstLap = [...raceData[0].Laps].sort((a, b) => a.LapNumber - b.LapNumber)[0];
             if (firstLap && firstLap.StartTime) {
                 const dateObj = new Date(firstLap.StartTime);
                 const year = dateObj.getFullYear();
@@ -207,7 +372,7 @@ async function processEvents() {
             const raceName = eventType + ' ' + displayRoundNumber + '-' + raceNumber;
 
             let raceSerialTimestamp = '';
-            const firstLap = raceData[0].Laps.sort((a, b) => a.LapNumber - b.LapNumber)[0];
+            const firstLap = [...raceData[0].Laps].sort((a, b) => a.LapNumber - b.LapNumber)[0];
             if (firstLap && firstLap.StartTime) {
                 const dateObj = new Date(firstLap.StartTime);
                 const year = dateObj.getFullYear();
@@ -347,7 +512,8 @@ async function processEvents() {
             }
         });
         const sanitizedData = sanitizeRaceResults(allRaceResults);
-        await updateGoogleSheet(sanitizedData, lapsToDo);
+        const headerLaps = pickHeaderLaps(validRaces, lapsToDo);
+        await updateGoogleSheet(sanitizedData, headerLaps);
         console.log('RaceResult sheet has been updated.');
 
     } catch (err) {
