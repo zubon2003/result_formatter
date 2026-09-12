@@ -1,0 +1,381 @@
+:root {
+    --bg: #0c0f14;
+    --panel: #161b24;
+    --panel-2: #1d2430;
+    --line: #2a3340;
+    --text: #e7ecf2;
+    --muted: #9aa6b5;
+    --accent: #4ea1ff;
+    --done: #2ecc71;
+    --live: #ffb020;
+    --pending: #7a8696;
+    --gold: #ffd24a;
+    --silver: #cfd8e3;
+    --bronze: #d8924a;
+    font-size: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Kaku Gothic ProN",
+        "Yu Gothic", Meiryo, Roboto, sans-serif;
+    line-height: 1.45;
+    -webkit-text-size-adjust: 100%;
+}
+
+/* ---- App bar ---------------------------------------------------------- */
+.appbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: linear-gradient(180deg, #11151c, #0c0f14);
+    border-bottom: 1px solid var(--line);
+    padding: env(safe-area-inset-top) 0 0;
+}
+.appbar-inner {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 12px 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+}
+.titles { display: flex; flex-direction: column; min-width: 0; }
+.event-name {
+    font-size: 1.15rem;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.event-meta { font-size: 0.78rem; color: var(--muted); }
+.home-link {
+    color: var(--text);
+    text-decoration: none;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 2px 8px;
+    margin-right: 2px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+.home-link:active { background: var(--panel); }
+
+/* イベント一覧(ランディング) */
+.event-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px;
+    margin: 10px 0;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    color: var(--text);
+    text-decoration: none;
+}
+.event-row:active { background: var(--panel-2); }
+.event-row-name { font-weight: 700; }
+.event-row-meta { font-size: 0.78rem; color: var(--muted); }
+
+/* ---- Toolbar ---------------------------------------------------------- */
+.toolbar {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 8px 16px;
+    display: flex;
+    gap: 8px;
+}
+.tool-btn {
+    flex: 1;
+    min-height: 40px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--text);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+.tool-btn:active { background: var(--panel); }
+
+/* ---- Layout ----------------------------------------------------------- */
+.app {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 4px 12px 40px;
+}
+.loading { padding: 40px 12px; text-align: center; color: var(--muted); }
+
+/* ---- Stage ------------------------------------------------------------ */
+.stage { margin: 18px 0 10px; }
+.stage-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 4px 8px;
+}
+.stage-title { font-size: 1.05rem; font-weight: 700; }
+.stage-kind {
+    font-size: 0.7rem;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 8px;
+}
+
+/* Stage standings */
+.standings {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    overflow: hidden;
+}
+.standings > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.standings > summary::-webkit-details-marker { display: none; }
+.standings > summary::before {
+    content: "▸";
+    color: var(--muted);
+    transition: transform .15s ease;
+}
+.standings[open] > summary::before { transform: rotate(90deg); }
+
+/* ---- Round (collapsible) --------------------------------------------- */
+.round {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+.round > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 13px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    -webkit-tap-highlight-color: transparent;
+}
+.round > summary::-webkit-details-marker { display: none; }
+.round > summary::before {
+    content: "▸";
+    color: var(--muted);
+    transition: transform .15s ease;
+    flex: 0 0 auto;
+}
+.round[open] > summary::before { transform: rotate(90deg); }
+.round-title { font-weight: 700; flex: 1 1 auto; min-width: 0; }
+.round-sub { font-size: 0.75rem; color: var(--muted); }
+
+.round-body { padding: 4px 10px 12px; }
+
+/* ---- Race card -------------------------------------------------------- */
+.race {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    margin: 8px 0;
+    background: var(--panel-2);
+    overflow: hidden;
+}
+.race-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+}
+.race-name { font-weight: 600; font-size: 0.92rem; }
+.badge {
+    margin-left: auto;
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 2px 9px;
+    border-radius: 999px;
+    color: #0c0f14;
+}
+.badge.done { background: var(--done); }
+.badge.live { background: var(--live); }
+.badge.pending { background: var(--pending); color: #fff; }
+
+/* result table */
+table.grid { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+table.grid th, table.grid td {
+    padding: 7px 8px;
+    text-align: left;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+table.grid th {
+    font-size: 0.7rem;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+table.grid tr:last-child td { border-bottom: none; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* バンド(チャンネル)列を右詰めに。Δ の有無で band がずれないよう flex で中央揃え＋固定幅 */
+td.chcol, th.chcol { text-align: right; white-space: nowrap; }
+td.chcol .chwrap { display: flex; justify-content: flex-end; align-items: center; gap: 5px; }
+td.chcol .chg-slot { flex: 0 0 1.3em; display: inline-flex; align-items: center; justify-content: center; }
+td.chcol .ch-label { min-width: 2.1em; text-align: right; }
+td.pos { width: 2.2em; font-weight: 700; text-align: center; }
+.pilot { width: 99%; white-space: normal; }
+
+.pos-1 { color: var(--gold); }
+.pos-2 { color: var(--silver); }
+.pos-3 { color: var(--bronze); }
+.dnf { color: var(--live); font-weight: 700; }
+
+/* channel chip */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.dot {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 1px solid rgba(255,255,255,.25);
+    flex: 0 0 auto;
+}
+.ch-label { font-variant-numeric: tabular-nums; }
+
+.empty { padding: 12px; color: var(--muted); font-size: 0.85rem; }
+
+/* 空きチャンネル枠（パイロット未割当）の行 */
+tr.slot-empty { opacity: 0.45; }
+
+/* チャンネル変更マーク (本体FPVTrackside の Δ 相当) */
+.chg {
+    display: inline-block;
+    font-weight: 700;
+    color: #0c0f14;
+    background: var(--live);
+    border-radius: 5px;
+    padding: 0 5px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    vertical-align: middle;
+}
+
+/* ---- Pilot link ------------------------------------------------------- */
+.pilot-link {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(78,161,255,.5);
+}
+.pilot-link:active { opacity: .6; }
+
+/* 確定レース名のリンク */
+.race-link {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dotted rgba(78,161,255,.5);
+}
+.race-link:active { opacity: .6; }
+
+/* レース詳細のメタ情報 */
+.rd-head { margin: 2px 0 6px; }
+.rd-meta { color: var(--muted); font-size: 0.8rem; margin-top: 6px; }
+
+/* ---- Pilot detail overlay -------------------------------------------- */
+body.no-scroll { overflow: hidden; }
+.overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: var(--bg);
+    display: none;
+    flex-direction: column;
+}
+.overlay.open { display: flex; }
+.overlay-bar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
+    background: linear-gradient(180deg, #11151c, #0c0f14);
+    border-bottom: 1px solid var(--line);
+}
+.back-btn {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    min-height: 38px;
+    padding: 0 14px;
+    font-size: 0.92rem;
+    cursor: pointer;
+}
+.back-btn:active { background: var(--panel); }
+.overlay-title {
+    font-weight: 700;
+    font-size: 1.05rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.overlay-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 12px calc(env(safe-area-inset-bottom) + 28px);
+}
+.pilot-detail { max-width: 760px; margin: 0 auto; }
+.pd-h { font-size: 0.95rem; margin: 16px 4px 6px; }
+.pd-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.pd-races { display: flex; flex-direction: column; gap: 10px; }
+.pd-race {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.pd-race-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+.pd-res { font-weight: 600; font-size: 0.82rem; color: var(--muted); }
+
+.appfoot {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 16px;
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-align: center;
+}
+
+@media (min-width: 760px) {
+    :root { font-size: 17px; }
+}

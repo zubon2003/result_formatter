@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#11151c">
+    <title>FPV Race Results</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header class="appbar">
+        <div class="appbar-inner">
+            <div class="titles">
+                <span class="event-name">Events</span>
+            </div>
+        </div>
+    </header>
+
+    <main id="list" class="app">
+        <div class="loading">Loading…</div>
+    </main>
+
+    <script>
+        fetch("events.json", { cache: "no-store" })
+            .then(function (r) { return r.json(); })
+            .then(function (events) {
+                var m = document.getElementById("list");
+                m.innerHTML = "";
+                if (!events || !events.length) {
+                    m.innerHTML = '<div class="empty">No events.</div>';
+                    return;
+                }
+                for (var i = 0; i < events.length; i++) {
+                    var e = events[i];
+                    var a = document.createElement("a");
+                    a.className = "event-row";
+                    a.href = e.slug + "/";
+                    a.innerHTML = '<span class="event-row-name"></span>' +
+                        '<span class="event-row-meta">' + (e.races || 0) + ' races</span>';
+                    a.querySelector(".event-row-name").textContent = e.name || e.slug;
+                    m.appendChild(a);
+                }
+            })
+            .catch(function () {
+                document.getElementById("list").innerHTML = '<div class="empty">Failed to load events.</div>';
+            });
+    </script>
+</body>
+</html>

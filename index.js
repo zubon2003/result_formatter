@@ -2,26 +2,37 @@ const fs = require('fs');
 const path = require('path');
 const { eventsDir } = require('./src/config');
 const { processEvents } = require('./src/data-processor');
-const { startServer, updateCache } = require('./src/web-server');
+const { startServer } = require('./src/web-server');
+const { startDisplayServer } = require('./src/display-server');
 
-const DEBOUNCE_DELAY = 5000; // 5秒
+const DEBOUNCE_DELAY = 3000; // 3秒 (変更が静まってから再生成)
 let debounceTimer;
 let isProcessing = false; // 処理中フラグ
+let pendingRun = false;   // 処理中に来た要求を保留
 
 // メインの実行関数
 async function run() {
+    // 処理中に呼ばれたら破棄せず保留し、完了後にもう一度走らせる
     if (isProcessing) {
-        console.log('Already processing. Skipping new run.');
+        pendingRun = true;
+        console.log('Already processing. Queued a rerun for when it finishes.');
         return;
     }
     isProcessing = true;
-    console.log('Starting to process events...');
     try {
-        // processEventsにWebキャッシュの更新を任せる
-        await processEvents(updateCache);
-        console.log('Processing finished successfully.');
-    } catch (error) {
-        console.error('An error occurred during processing:', error);
+        do {
+            pendingRun = false;
+            console.log('Starting to process events...');
+            try {
+                await processEvents();
+                console.log('Processing finished successfully.');
+            } catch (error) {
+                console.error('An error occurred during processing:', error);
+            }
+            if (pendingRun) {
+                console.log('Pending request detected. Rerunning...');
+            }
+        } while (pendingRun);
     } finally {
         isProcessing = false;
     }
@@ -40,7 +51,7 @@ function watchFiles() {
     console.log(`Watching for changes in ${eventsDir}...`);
     fs.watch(eventsDir, { recursive: true }, (eventType, filename) => {
         if (filename) {
-            const triggerFiles = ['Event.json', 'Pilots.json', 'Rounds.json', 'Race.json', 'Result.json'];
+            const triggerFiles = ['Event.json', 'Pilots.json', 'Rounds.json', 'Stages.json', 'Race.json', 'Result.json'];
             const isTriggerFile = triggerFiles.some(file => filename.endsWith(file));
 
             if (!isTriggerFile) {
@@ -59,9 +70,12 @@ function watchFiles() {
 
 // アプリケーションの開始
 function main() {
-    // Webサーバーを起動し、設定変更時のコールバックとして run を渡す
+    // 設定UI(別ポート)を起動し、設定変更時のコールバックとして run を渡す
     startServer(run);
-    
+
+    // 表示用 web (結果ビュー) を別ポートで配信
+    startDisplayServer();
+
     // 初回実行
     run();
 

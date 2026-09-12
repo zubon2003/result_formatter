@@ -1,0 +1,972 @@
+[
+  {
+    "Number": 1,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5740,
+    "DisplayName": "F1",
+    "ID": "00000001-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5760,
+    "DisplayName": "F2",
+    "ID": "00000002-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5780,
+    "DisplayName": "F3",
+    "ID": "00000003-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5800,
+    "DisplayName": "F4",
+    "ID": "00000004-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5820,
+    "DisplayName": "F5",
+    "ID": "00000005-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5840,
+    "DisplayName": "F6",
+    "ID": "00000006-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5860,
+    "DisplayName": "F7",
+    "ID": "00000007-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "Fatshark",
+    "ShortBand": "F",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5880,
+    "DisplayName": "F8",
+    "ID": "00000008-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5658,
+    "DisplayName": "R1",
+    "ID": "00000009-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5695,
+    "DisplayName": "R2",
+    "ID": "0000000a-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5732,
+    "DisplayName": "R3",
+    "ID": "0000000b-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5769,
+    "DisplayName": "R4",
+    "ID": "0000000c-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5806,
+    "DisplayName": "R5",
+    "ID": "0000000d-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5843,
+    "DisplayName": "R6",
+    "ID": "0000000e-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5880,
+    "DisplayName": "R7",
+    "ID": "0000000f-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "Raceband",
+    "ShortBand": "R",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5917,
+    "DisplayName": "R8",
+    "ID": "00000010-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5865,
+    "DisplayName": "A1",
+    "ID": "00000011-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5845,
+    "DisplayName": "A2",
+    "ID": "00000012-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5825,
+    "DisplayName": "A3",
+    "ID": "00000013-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5805,
+    "DisplayName": "A4",
+    "ID": "00000014-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5785,
+    "DisplayName": "A5",
+    "ID": "00000015-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5765,
+    "DisplayName": "A6",
+    "ID": "00000016-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5745,
+    "DisplayName": "A7",
+    "ID": "00000017-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "A",
+    "ShortBand": "A",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5725,
+    "DisplayName": "A8",
+    "ID": "00000018-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5733,
+    "DisplayName": "B1",
+    "ID": "00000019-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5752,
+    "DisplayName": "B2",
+    "ID": "0000001a-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5771,
+    "DisplayName": "B3",
+    "ID": "0000001b-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5790,
+    "DisplayName": "B4",
+    "ID": "0000001c-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5809,
+    "DisplayName": "B5",
+    "ID": "0000001d-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5828,
+    "DisplayName": "B6",
+    "ID": "0000001e-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5847,
+    "DisplayName": "B7",
+    "ID": "0000001f-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "B",
+    "ShortBand": "B",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5866,
+    "DisplayName": "B8",
+    "ID": "00000020-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5660,
+    "DisplayName": "D1",
+    "ID": "00000021-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5695,
+    "DisplayName": "D2",
+    "ID": "00000022-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5735,
+    "DisplayName": "D3",
+    "ID": "00000023-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5770,
+    "DisplayName": "D4",
+    "ID": "00000024-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5805,
+    "DisplayName": "D5",
+    "ID": "00000025-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5878,
+    "DisplayName": "D6",
+    "ID": "00000026-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5914,
+    "DisplayName": "D7",
+    "ID": "00000027-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "DJIFPVHD",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5839,
+    "DisplayName": "D8",
+    "ID": "00000028-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5669,
+    "DisplayName": "D1",
+    "ID": "0000004b-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5705,
+    "DisplayName": "D2",
+    "ID": "0000004c-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5768,
+    "DisplayName": "D3",
+    "ID": "0000004d-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5804,
+    "DisplayName": "D4",
+    "ID": "0000004e-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5839,
+    "DisplayName": "D5",
+    "ID": "0000004f-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5876,
+    "DisplayName": "D6",
+    "ID": "00000050-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "DJIO3",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5912,
+    "DisplayName": "D7",
+    "ID": "00000051-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5658,
+    "DisplayName": "DR1",
+    "ID": "00000064-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5695,
+    "DisplayName": "DR2",
+    "ID": "00000065-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5732,
+    "DisplayName": "DR3",
+    "ID": "00000066-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5769,
+    "DisplayName": "DR4",
+    "ID": "00000067-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5806,
+    "DisplayName": "DR5",
+    "ID": "00000068-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5843,
+    "DisplayName": "DR6",
+    "ID": "00000069-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5880,
+    "DisplayName": "DR7",
+    "ID": "0000006a-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "DJIO4",
+    "ShortBand": "D",
+    "ChannelPrefix": "R",
+    "Frequency": 5917,
+    "DisplayName": "DR8",
+    "ID": "0000006b-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5705,
+    "DisplayName": "E1",
+    "ID": "00000029-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5685,
+    "DisplayName": "E2",
+    "ID": "0000002a-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5665,
+    "DisplayName": "E3",
+    "ID": "0000002b-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5645,
+    "DisplayName": "E4",
+    "ID": "0000002c-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5885,
+    "DisplayName": "E5",
+    "ID": "0000002d-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5905,
+    "DisplayName": "E6",
+    "ID": "0000002e-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5925,
+    "DisplayName": "E7",
+    "ID": "0000002f-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "E",
+    "ShortBand": "E",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5945,
+    "DisplayName": "E8",
+    "ID": "00000030-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5658,
+    "DisplayName": "ZR1",
+    "ID": "00000031-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5695,
+    "DisplayName": "ZR2",
+    "ID": "00000032-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5732,
+    "DisplayName": "ZR3",
+    "ID": "00000033-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5769,
+    "DisplayName": "ZR4",
+    "ID": "00000034-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5806,
+    "DisplayName": "ZR5",
+    "ID": "00000035-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5843,
+    "DisplayName": "ZR6",
+    "ID": "00000036-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5880,
+    "DisplayName": "ZR7",
+    "ID": "00000037-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "R",
+    "Frequency": 5917,
+    "DisplayName": "ZR8",
+    "ID": "00000038-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "F",
+    "Frequency": 5760,
+    "DisplayName": "ZF2",
+    "ID": "00000039-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "SharkByte",
+    "ShortBand": "Z",
+    "ChannelPrefix": "F",
+    "Frequency": 5800,
+    "DisplayName": "ZF4",
+    "ID": "0000003a-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5333,
+    "DisplayName": "L1",
+    "ID": "0000003b-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5373,
+    "DisplayName": "L2",
+    "ID": "0000003c-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5413,
+    "DisplayName": "L3",
+    "ID": "0000003d-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5453,
+    "DisplayName": "L4",
+    "ID": "0000003e-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5493,
+    "DisplayName": "L5",
+    "ID": "0000003f-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5533,
+    "DisplayName": "L6",
+    "ID": "00000040-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5573,
+    "DisplayName": "L7",
+    "ID": "00000041-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "LowBand",
+    "ShortBand": "L",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5613,
+    "DisplayName": "L8",
+    "ID": "00000042-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5362,
+    "DisplayName": "D1",
+    "ID": "00000043-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5399,
+    "DisplayName": "D2",
+    "ID": "00000044-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5436,
+    "DisplayName": "D3",
+    "ID": "00000045-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5473,
+    "DisplayName": "D4",
+    "ID": "00000046-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5510,
+    "DisplayName": "D5",
+    "ID": "00000047-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5547,
+    "DisplayName": "D6",
+    "ID": "00000048-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5584,
+    "DisplayName": "D7",
+    "ID": "00000049-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "Diatone",
+    "ShortBand": "D",
+    "ChannelPrefix": "\u0000",
+    "Frequency": 5621,
+    "DisplayName": "D8",
+    "ID": "0000004a-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 1,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5658,
+    "DisplayName": "WR1",
+    "ID": "0000006e-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 2,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5695,
+    "DisplayName": "WR2",
+    "ID": "0000006f-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 3,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5732,
+    "DisplayName": "WR3",
+    "ID": "00000070-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 4,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5769,
+    "DisplayName": "WR4",
+    "ID": "00000071-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 5,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5806,
+    "DisplayName": "WR5",
+    "ID": "00000072-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 6,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5843,
+    "DisplayName": "WR6",
+    "ID": "00000073-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 7,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5880,
+    "DisplayName": "WR7",
+    "ID": "00000074-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  },
+  {
+    "Number": 8,
+    "Band": "WalkSnail",
+    "ShortBand": "W",
+    "ChannelPrefix": "R",
+    "Frequency": 5917,
+    "DisplayName": "WR8",
+    "ID": "00000075-0000-0000-0000-000000000000",
+    "ExternalID": 0
+  }
+]

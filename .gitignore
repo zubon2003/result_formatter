@@ -1,0 +1,17 @@
+# 依存
+node_modules/
+
+# 個人設定・機密（公開しない）
+config.json
+config - *.json
+credentials.json
+
+# バックアップ（アップデート対象外）
+config.json.bak
+*.bak
+
+# 生成物・ローカル状態
+webdist/
+
+# ログ等
+*.log
