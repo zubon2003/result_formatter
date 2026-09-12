@@ -1,5 +1,5 @@
 const { google } = require('googleapis');
-const { config, credentialsPath } = require('./config');
+const { loadConfig, credentialsPath } = require('./config');
 
 // Google Sheets APIの認証
 const auth = new google.auth.GoogleAuth({
@@ -23,9 +23,100 @@ function sanitizeRaceResults(raceResults) {
     });
 }
 
+// シートの行数・列数が足りない場合に拡張するリクエストを返す。
+// グリッドより外へ書き込もうとすると batchUpdate 全体が失敗するため、書き込み前に必ず呼ぶ。
+function buildGridResizeRequests(sheet, neededRows, neededColumns) {
+    const gridProperties = sheet.properties && sheet.properties.gridProperties;
+    // グリッド情報が取れないシート (非グリッド等) は縮小事故を避けるため触らない
+    if (!gridProperties) {
+        return [];
+    }
+    const currentRowCount = gridProperties.rowCount || 0;
+    const currentColumnCount = gridProperties.columnCount || 0;
+    const newGridProperties = {};
+    const fields = [];
+
+    if (currentRowCount < neededRows) {
+        newGridProperties.rowCount = neededRows;
+        fields.push('gridProperties.rowCount');
+    }
+    if (currentColumnCount < neededColumns) {
+        newGridProperties.columnCount = neededColumns;
+        fields.push('gridProperties.columnCount');
+    }
+    if (fields.length === 0) {
+        return [];
+    }
+
+    console.log(`Expanding sheet "${sheet.properties.title}" grid: rows ${currentRowCount} -> ${newGridProperties.rowCount || currentRowCount}, columns ${currentColumnCount} -> ${newGridProperties.columnCount || currentColumnCount}.`);
+    return [{
+        updateSheetProperties: {
+            properties: {
+                sheetId: sheet.properties.sheetId,
+                gridProperties: newGridProperties
+            },
+            fields: fields.join(',')
+        }
+    }];
+}
+
+// batchUpdate 1回あたりのペイロード上限 (API上限 10MB に対する安全マージン)
+const MAX_BATCH_BYTES = 4 * 1024 * 1024;
+
+function requestSize(request) {
+    return Buffer.byteLength(JSON.stringify(request));
+}
+
+// 巨大な updateCells (数百〜数千行) を行単位に分割する
+function splitLargeUpdateCells(request) {
+    const uc = request.updateCells;
+    if (!uc || !uc.start || !uc.rows || uc.rows.length <= 1) return [request];
+    const totalSize = requestSize(request);
+    if (totalSize <= MAX_BATCH_BYTES) return [request];
+
+    const perRow = Math.max(1, Math.ceil(totalSize / uc.rows.length));
+    const rowsPerChunk = Math.max(1, Math.floor(MAX_BATCH_BYTES / perRow));
+    const parts = [];
+    for (let i = 0; i < uc.rows.length; i += rowsPerChunk) {
+        parts.push({
+            updateCells: {
+                rows: uc.rows.slice(i, i + rowsPerChunk),
+                start: Object.assign({}, uc.start, { rowIndex: uc.start.rowIndex + i }),
+                fields: uc.fields
+            }
+        });
+    }
+    console.log(`Splitting a ${uc.rows.length}-row write into ${parts.length} requests (payload ${(totalSize / 1048576).toFixed(2)}MB).`);
+    return parts;
+}
+
+// リクエスト列を順序を保ったままサイズ上限内に分割して送信する
+async function executeBatchUpdate(spreadsheetId, requests) {
+    const expanded = [];
+    requests.forEach(r => expanded.push(...splitLargeUpdateCells(r)));
+
+    let chunk = [];
+    let chunkSize = 0;
+    const flush = async () => {
+        if (chunk.length === 0) return;
+        await sheets.spreadsheets.batchUpdate({ spreadsheetId, resource: { requests: chunk } });
+        chunk = [];
+        chunkSize = 0;
+    };
+    for (const request of expanded) {
+        const size = requestSize(request);
+        if (chunk.length > 0 && chunkSize + size > MAX_BATCH_BYTES) {
+            await flush();
+        }
+        chunk.push(request);
+        chunkSize += size;
+    }
+    await flush();
+}
+
 async function updateGoogleSheet(raceResults, lapsToDo) {
     try {
-        const spreadsheetId = config.google_spreadsheet_id;
+        const spreadsheetId = loadConfig().google_spreadsheet_id;
         if (!spreadsheetId) {
             console.warn('google_spreadsheet_id is not set in config.json. Skipping Google Sheet update.');
             return;
@@ -84,21 +175,9 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
             return;
         }
         const sheetId = sheet.properties.sheetId;
-        const currentColumnCount = sheet.properties.gridProperties ? sheet.properties.gridProperties.columnCount : 0; // Get current column count
 
-        if (currentColumnCount < 100) { // If current columns are less than desired
-            requests.push({
-                updateSheetProperties: {
-                    properties: {
-                        sheetId: sheetId,
-                        gridProperties: {
-                            columnCount: 100 // Resize to 100
-                        }
-                    },
-                    fields: 'gridProperties.columnCount'
-                }
-            });
-        }
+        // --- 行数・列数の確保（ヘッダー1行 + データ行） ---
+        requests.push(...buildGridResizeRequests(sheet, 1 + raceResults.length, 100));
 
         // --- シートの並び順を設定 ---
         requests.push({
@@ -265,22 +344,20 @@ async function updateGoogleSheet(raceResults, lapsToDo) {
 
         // --- batchUpdateの実行 ---
         if (requests.length > 0) {
-            await sheets.spreadsheets.batchUpdate({
-                spreadsheetId,
-                resource: { requests },
-            });
+            await executeBatchUpdate(spreadsheetId, requests);
         }
 
         console.log(`Successfully updated Google Sheet "${sheetName}".`);
 
     } catch (err) {
-        console.error('Error updating Google Sheet:', err);
+        console.error('Error updating Google Sheet:', (err && err.message) || err);
+        if (err && err.errors) console.error(JSON.stringify(err.errors, null, 2));
     }
 }
 
 async function updateSingleRankingSheet(categoryKey, sheetTitle, sourceData, allPilots, index) {
     try {
-        const spreadsheetId = config.google_spreadsheet_id;
+        const spreadsheetId = loadConfig().google_spreadsheet_id;
         if (!spreadsheetId) {
             // google_spreadsheet_id がなければ何もしない
             return;
@@ -297,7 +374,14 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, sourceData, all
             console.log(`Sheet "${sheetTitle}" not found, creating it...`);
             const addSheetRequest = {
                 addSheet: {
-                    properties: { title: sheetTitle, index: index },
+                    properties: {
+                        title: sheetTitle,
+                        index: index,
+                        gridProperties: {
+                            rowCount: 1000,
+                            columnCount: 26
+                        }
+                    },
                 },
             };
             const response = await sheets.spreadsheets.batchUpdate({
@@ -339,7 +423,14 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, sourceData, all
         if (categoryKey === 'minLap') {
             // Minimum Lap Ranking の処理
             sourceData.sort((a, b) => a.time - b.time);
-            rankingData = sourceData.slice(0, 100).map(item => ({
+            const minLapLimit = Number(loadConfig().min_lap_ranking_limit) || 0;
+            const minLapSource = (minLapLimit > 0 && sourceData.length > minLapLimit)
+                ? sourceData.slice(0, minLapLimit)
+                : sourceData;
+            if (minLapSource.length < sourceData.length) {
+                console.log(`Minimum Lap Ranking: ${sourceData.length} 件中 ${minLapSource.length} 件に制限しました (min_lap_ranking_limit)。`);
+            }
+            rankingData = minLapSource.map(item => ({
                 pilotName: item.pilotName,
                 data: {
                     time: item.time,
@@ -367,6 +458,9 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, sourceData, all
             });
         }
 
+
+        // --- 行数・列数の確保（タイトル/空行/ヘッダーの3行 + データ行） ---
+        requests.push(...buildGridResizeRequests(sheet, 3 + rankingData.length, 4));
 
         // --- シートの並び順を設定 ---
         requests.push({
@@ -560,15 +654,13 @@ async function updateSingleRankingSheet(categoryKey, sheetTitle, sourceData, all
 
         // --- batchUpdateの実行 ---
         if (requests.length > 0) {
-            await sheets.spreadsheets.batchUpdate({
-                spreadsheetId,
-                resource: { requests },
-            });
+            await executeBatchUpdate(spreadsheetId, requests);
         }
 
         console.log(`Successfully updated Google Sheet "${sheetTitle}".`);
     } catch (err) {
-        console.error(`Error updating ${sheetTitle} Sheet:`, err);
+        console.error(`Error updating ${sheetTitle} Sheet:`, (err && err.message) || err);
+        if (err && err.errors) console.error(JSON.stringify(err.errors, null, 2));
     }
 }
 

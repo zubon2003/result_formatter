@@ -14,6 +14,8 @@ const DEFAULTS = {
     published_event_ids: [],
     web_unpublished_event_ids: [],
     leaderboard_round: 'all',
+    // Minimum Lap Ranking シートに書き出す最大件数 (0 = 無制限)
+    min_lap_ranking_limit: 0,
     publish: {
         enabled: false,
         provider: 'r2',
@@ -25,22 +27,38 @@ const DEFAULTS = {
     }
 };
 
+// FPVTrackside の標準データ場所 (Windows: %LOCALAPPDATA%\FPVTrackside)
+function defaultFpvDir() {
+    const la = process.env.LOCALAPPDATA;
+    return la ? path.join(la, 'FPVTrackside').replace(/\\/g, '/') : '';
+}
+
 function withDefaults(parsed) {
-    return {
+    const merged = {
         ...DEFAULTS,
         ...parsed,
         // publish は項目欠落を防ぐため個別にもマージ
         publish: { ...DEFAULTS.publish, ...((parsed && parsed.publish) || {}) }
     };
+    // FPVTrackside ディレクトリが空欄なら標準の保存先に自動補完
+    if (!merged.fpvtrackside_dir_path || !String(merged.fpvtrackside_dir_path).trim()) {
+        merged.fpvtrackside_dir_path = defaultFpvDir();
+    }
+    return merged;
 }
+
+let warnedNoConfig = false;
 
 function loadConfig() {
     try {
         if (fs.existsSync(configPath)) {
             return withDefaults(JSON.parse(fs.readFileSync(configPath, 'utf8')));
         }
-        console.warn('Warning: config.json not found. Using built-in defaults ' +
-            '(configure via the settings UI and Save to create config.json).');
+        if (!warnedNoConfig) {
+            console.warn('Warning: config.json not found. Using built-in defaults ' +
+                '(configure via the settings UI and Save to create config.json).');
+            warnedNoConfig = true;
+        }
         return withDefaults({});
     } catch (error) {
         console.error('Error reading or parsing config.json:', error);
