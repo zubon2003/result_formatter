@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const { config, eventsDir, configPath, loadConfig } = require('./config');
+const { readJsonOrNull } = require('./json-file');
 
 function startServer(reprocessCallback) {
     const server = http.createServer(async (req, res) => {
@@ -47,7 +48,10 @@ function startServer(reprocessCallback) {
                 }).map(async eventId => {
                     const eventJsonPath = path.join(eventsDir, eventId, 'Event.json');
                     if (fs.existsSync(eventJsonPath)) {
-                        const eventData = JSON.parse(await fs.promises.readFile(eventJsonPath, 'utf8'));
+                        // 1 イベントの Event.json が壊れていても一覧全体を 500 に
+                        // しない。そのイベントだけ落として残りを返す。
+                        const eventData = readJsonOrNull(eventJsonPath);
+                        if (!eventData || !eventData[0]) return null;
                         return { id: eventId, name: eventData[0].Name };
                     }
                     return null;
@@ -74,7 +78,13 @@ function startServer(reprocessCallback) {
                     return;
                 }
 
-                const roundsData = JSON.parse(await fs.promises.readFile(roundsJsonPath, 'utf8'));
+                // Rounds.json が壊れていたらラウンド選択を「すべて」だけにして返す。
+                const roundsData = readJsonOrNull(roundsJsonPath);
+                if (!roundsData) {
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify([{ id: 'all', name: 'すべてのラウンド' }]));
+                    return;
+                }
                 const rounds = roundsData
                     .filter(round => round.Valid === true)
                     .map(round => ({

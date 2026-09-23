@@ -23,8 +23,14 @@ async function run() {
             pendingRun = false;
             console.log('Starting to process events...');
             try {
-                await processEvents();
-                console.log('Processing finished successfully.');
+                // 壊れた JSON を読み飛ばした場合は「成功」と言い切らない。
+                // どのファイルが原因かは処理中のログに出ている。
+                const r = await processEvents();
+                if (r && (r.skippedEvents || r.skippedRaces)) {
+                    console.log(`Processing finished with skipped data (events: ${r.skippedEvents}, races: ${r.skippedRaces}).`);
+                } else {
+                    console.log('Processing finished successfully.');
+                }
             } catch (error) {
                 console.error('An error occurred during processing:', error);
             }

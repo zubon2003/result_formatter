@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { loadConfig, eventsDir } = require('./config');
 const { sanitizeRaceResults, updateGoogleSheet, updateAllRankingSheets } = require('./google-sheets');
+const { readJsonOrNull } = require('./json-file');
 
 // RaceResult シートの "Race Time (XLap)" ヘッダに使う Lap 数を決める。
 // 複数イベント混在(selected_event_id='all')時に「最後に処理したイベント」依存で
@@ -55,6 +56,8 @@ async function processEvents() {
         const allValidLapTimes = [];
 
         const allRaces = []; // 全イベントの全レース情報を格納
+        // JSON が壊れていて読み飛ばした数。処理の最後にまとめて報告する。
+        let skippedEvents = 0, skippedRaces = 0;
 
         for (const eventId of targetEventIds) {
             const eventDir = path.join(eventsDir, eventId);
@@ -67,9 +70,16 @@ async function processEvents() {
                 continue;
             }
 
-            const eventData = JSON.parse(fs.readFileSync(eventJsonPath, 'utf8'));
-            const pilotsData = JSON.parse(fs.readFileSync(pilotsJsonPath, 'utf8'));
-            const roundsData = JSON.parse(fs.readFileSync(roundsJsonPath, 'utf8'));
+            // イベント共通の3ファイルは、どれか1つでも読めなければこのイベントは
+            // 組み立てられない。処理全体を止めず、このイベントだけ諦めて次へ進む。
+            const eventData = readJsonOrNull(eventJsonPath);
+            const pilotsData = readJsonOrNull(pilotsJsonPath);
+            const roundsData = readJsonOrNull(roundsJsonPath);
+            if (!eventData || !pilotsData || !roundsData || !eventData[0]) {
+                console.warn(`イベント ${eventId} を除外して続行します (イベント共通ファイルが読めません)。`);
+                skippedEvents++;
+                continue;
+            }
 
             eventName = eventData[0].Name; // 最後に処理されたイベント名が使われる
             lapsToDo = eventData[0].Laps;
@@ -84,10 +94,18 @@ async function processEvents() {
                 const resultJsonPath = path.join(eventDir, raceDir, 'Result.json');
 
                 if (fs.existsSync(raceJsonPath)) {
-                    const raceData = JSON.parse(fs.readFileSync(raceJsonPath, 'utf8'));
+                    // Race.json が壊れていたら、そのレースだけ落として続行する。
+                    // レース1件のためにイベント全体 (何十レース) を捨てない。
+                    const raceData = readJsonOrNull(raceJsonPath);
+                    if (!raceData || !raceData[0]) {
+                        console.warn(`  レース ${raceDir} を除外して続行します (イベント ${eventId})。`);
+                        skippedRaces++;
+                        continue;
+                    }
+                    // Result.json は無くても成立するので、壊れていても null 扱いで続行。
                     let resultData = null;
                     if (fs.existsSync(resultJsonPath)) {
-                        resultData = JSON.parse(fs.readFileSync(resultJsonPath, 'utf8'));
+                        resultData = readJsonOrNull(resultJsonPath);
                     }
                     const round = roundsData.find(r => r.ID === raceData[0].Round);
                     allRaces.push({
@@ -104,6 +122,12 @@ async function processEvents() {
                 }
             }
         }
+
+        if (skippedEvents || skippedRaces) {
+            console.warn(`JSON 破損により除外: イベント ${skippedEvents} 件 / レース ${skippedRaces} 件`);
+            console.warn('上の「JSON が壊れています」の記載で、どのファイルかを確認してください。');
+        }
+        console.log(`Loaded ${allRaces.length} race(s) from ${targetEventIds.length - skippedEvents} event(s).`);
 
         // 全レースをラウンドとレース番号でソート
         allRaces.sort((a, b) => a.roundNumber - b.roundNumber || a.raceNumber - b.raceNumber);
@@ -370,8 +394,15 @@ async function processEvents() {
         await updateGoogleSheet(sanitizedData, headerLaps);
         console.log('RaceResult sheet has been updated.');
 
+        return { skippedEvents, skippedRaces };
+
     } catch (err) {
+        // JSON の破損はここには来ない (readJsonOrNull が処理済み)。ここに来るのは
+        // 想定外の失敗なので、握りつぶさず呼び出し元に投げる。以前はここで止めて
+        // いたため、実際には何も出力できていないのに index.js が
+        // "Processing finished successfully." と表示していた。
         console.error('Error processing events:', err);
+        throw err;
     }
 }
 
